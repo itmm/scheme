@@ -61,30 +61,30 @@ std::ostream &Pair::write(std::ostream &out) const {
 
 static int ch { ' ' };
 
-Element *read_expression();
+Element *read_expression(std::istream &in);
 
-void eat_space() {
-	while (ch != EOF && ch <= ' ') { ch = std::cin.get(); }
+void eat_space(std::istream &in) {
+	while (ch != EOF && ch <= ' ') { ch = in.get(); }
 }
 
-Element *read_list() {
-	eat_space();
+Element *read_list(std::istream &in) {
+	eat_space(in);
 	if (ch == EOF) {
 		std::cerr << "incomplete list\n";
 		return nullptr;
 	}
 	if (ch == ')') {
-		ch = std::cin.get();
+		ch = in.get();
 		return &Null;
 	}
-	auto exp { read_expression() };
-	return new Pair { exp, read_list() };
+	auto exp { read_expression(in) };
+	return new Pair { exp, read_list(in) };
 }
 
-Element *read_expression() {
-	eat_space();
+Element *read_expression(std::istream &in) {
+	eat_space(in);
 	if (ch == EOF) { return nullptr; }
-	if (ch == '(') { ch = std::cin.get(); return read_list(); }
+	if (ch == '(') { ch = in.get(); return read_list(in); }
 	std::ostringstream result;
 	bool numeric { true };
 	int value { 0 };
@@ -95,7 +95,7 @@ Element *read_expression() {
 			numeric = false;
 		}
 		result << static_cast<char>(ch);
-		ch = std::cin.get();
+		ch = in.get();
 		if (ch == EOF || ch <= ' ' || ch == '(' || ch == ')') { break; }
 	}
 	return numeric ?
@@ -428,8 +428,25 @@ Element *Plus_Primitive::apply(Element *args) {
 	return new Integer(sum);
 }
 
-int main() {
-	Frame initial_frame { nullptr };
+Frame initial_frame { nullptr };
+
+void process_stream(std::istream &in, std::ostream *out, bool prompt) {
+	ch = in.get();
+	if (ch == '#') {
+		while (ch != EOF && ch >= ' ') { ch = in.get(); }
+	}
+	for (;;) {
+		if (prompt && out) { *out << "? "; }
+		auto exp { read_expression(in) };
+		if (! exp) { break; }
+		exp = eval(exp, &initial_frame);
+		if (out) { *out << exp << "\n"; }
+	}
+}
+
+#include <fstream>
+
+int main(int argc, const char *argv[]) {
 	initial_frame.insert("nil", &Null);
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
@@ -437,11 +454,16 @@ int main() {
 	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("+", new Plus_Primitive());
 
-	for (;;) {
-		std::cout << "? ";
-		auto exp { read_expression() };
-		if (! exp) { break; }
-		exp = eval(exp, &initial_frame);
-		std::cout << exp << "\n";
+	if (argc > 1) {
+		for (int i { 1 }; i < argc; ++i) {
+			if (argv[i] == std::string { "-" }) {
+				process_stream(std::cin, &std::cout, true);
+			} else {
+				std::ifstream in { argv[i] };
+				process_stream(in, &std::cout, false);
+			}
+		}
+	} else {
+		process_stream(std::cin, &std::cout, true);
 	}
 }
