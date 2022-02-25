@@ -124,7 +124,22 @@ Element *Frame::get(const std::string &key) const {
 		next_ ? next_->get(key) : nullptr;
 }
 
+class Primitive : public Element {
+	public:
+		virtual Element *apply(Element *args) = 0;
+		std::ostream &write(std::ostream &out) const override;
+
+};
+
+std::ostream &Primitive::write(std::ostream &out) const {
+	return out << "#primitive";
+}
+
 Element *apply(Element *op, Element *operands) {
+	auto prim { dynamic_cast<Primitive *>(op) };
+	if (prim) {
+		return prim->apply(operands);
+	}
 	std::cerr << "unknown operator " << op << "\n";
 	return nullptr;
 }
@@ -160,9 +175,39 @@ Element *eval(Element *exp, Frame *env) {
 	return nullptr;
 }
 
+class Plus_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Plus_Primitive::apply(Element *args) {
+	int sum { 0 };
+	Pair *cur { dynamic_cast<Pair *>(args) };
+	if (! cur) {
+		std::cerr << "+: no arg list: " << args << "\n";
+		return nullptr;
+	}
+	while (cur && cur != &Null) {
+		auto v { dynamic_cast<Integer *>(cur->head()) };
+		if (! v) {
+			std::cerr << "+: no number: " << cur->head() << "\n";
+			return nullptr;
+		}
+		sum += v->value();
+		auto nxt { dynamic_cast<Pair *>(cur->rest()) };
+		if (! nxt && cur->rest()) {
+			std::cerr << "+: no list: " << cur->rest() << "\n";
+			return nullptr;
+		}
+		cur = nxt;
+	}
+	return new Integer(sum);
+}
+
 int main() {
 	Frame initial_frame { nullptr };
 	initial_frame.insert("nil", &Null);
+	initial_frame.insert("+", new Plus_Primitive());
 
 	for (;;) {
 		std::cout << "? ";
