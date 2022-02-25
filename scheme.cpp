@@ -431,28 +431,40 @@ Element *Plus_Primitive::apply(Element *args) {
 Frame initial_frame { nullptr };
 
 void process_stream(std::istream &in, std::ostream *out, bool prompt) {
+	if (prompt && out) { *out << "? "; }
 	ch = in.get();
 	if (ch == '#') {
 		while (ch != EOF && ch >= ' ') { ch = in.get(); }
 	}
 	for (;;) {
-		if (prompt && out) { *out << "? "; }
 		auto exp { read_expression(in) };
 		if (! exp) { break; }
 		exp = eval(exp, &initial_frame);
 		if (out) { *out << exp << "\n"; }
+		if (prompt && out) { *out << "? "; }
 	}
 }
 
 #include <fstream>
 
+static const char setup[] =
+	"(define nil ())\n"
+	"(define (cadr l) (car (cdr l)))\n"
+	"(define (cddr l) (cdr (cdr l)))\n"
+	"(define (caddr l) (car (cddr l)))\n"
+	"(define (cdddr l) (cdr (cddr l)))\n";
+
 int main(int argc, const char *argv[]) {
-	initial_frame.insert("nil", &Null);
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("list", new List_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("+", new Plus_Primitive());
+
+	{
+		std::istringstream s { setup };
+		process_stream(s, nullptr, false);
+	}
 
 	if (argc > 1) {
 		for (int i { 1 }; i < argc; ++i) {
