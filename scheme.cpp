@@ -124,6 +124,24 @@ Element *Frame::get(const std::string &key) const {
 		next_ ? next_->get(key) : nullptr;
 }
 
+Element *apply(Element *op, Element *operands) {
+	std::cerr << "unknown operator " << op << "\n";
+	return nullptr;
+}
+
+Element *eval(Element *exp, Frame *env);
+
+Pair *eval_list(Pair *exp, Frame *env) {
+	if (! exp || exp == &Null) { return exp; }
+	auto head { eval(exp->head(), env) };
+	auto rest { dynamic_cast<Pair *>(exp->rest()) };
+	if (rest) {
+		return new Pair { head, eval_list(rest, env) };
+	} else {
+		return new Pair { head, eval(exp->rest(), env) };
+	}
+}
+
 Element *eval(Element *exp, Frame *env) {
 	if (! exp || exp == &Null) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
@@ -135,10 +153,8 @@ Element *eval(Element *exp, Frame *env) {
 	}
 	auto lst_value { dynamic_cast<Pair *>(exp) };
 	if (lst_value) {
-		return new Pair {
-			eval(lst_value->head(), env),
-			eval(lst_value->rest(), env)
-		};
+		auto lst { eval_list(lst_value, env) };
+		return apply(lst->head(), lst->rest());
 	}
 	std::cerr << "unknown expression " << exp << "\n";
 	return nullptr;
