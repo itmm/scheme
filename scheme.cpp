@@ -2,10 +2,32 @@
 #include <string>
 #include <sstream>
 
+class Element;
+Element *all_elements { nullptr };
+bool current_mark { true };
+
 class Element {
+		Element *next_;
+		bool mark_;
+
+	protected:
+		virtual void propagate_mark() { }
+			
 	public:
+		Element(): next_ { all_elements}, mark_ { current_mark } {
+			all_elements = this;
+		}
 		virtual ~Element() { }
 		virtual std::ostream &write(std::ostream &out) const = 0;
+		void mark() {
+			if (mark_ != current_mark) {
+				mark_ = current_mark;
+				propagate_mark();
+			}
+		}
+		bool get_mark() const { return mark_; }
+		Element *next() { return next_; }
+		void set_next(Element *n) { next_ = n; }
 };
 
 inline std::ostream &operator<<(std::ostream &out, Element *elm) {
@@ -33,6 +55,11 @@ using Integer = Value_Element<int>;
 class Pair : public Element {
 		Element *head_;
 		Element *rest_;
+	protected:
+		void propagate_mark() override {
+			if (head_) { head_->mark(); }
+			if (rest_) { rest_->mark(); }
+		}
 	public:
 		Pair(Element *head, Element *rest): head_ { head }, rest_ { rest } { }
 		Element *head() const { return head_; }
@@ -105,13 +132,23 @@ Element *read_expression(std::istream &in) {
 
 #include <map>
 
-class Frame {
+class Frame : public Element {
 		Frame *next_;
 		std::map<std::string, Element *> elements_;
+	protected:
+		void propagate_mark() override {
+			for (auto &v : elements_) {
+				v.second->mark();
+			}
+			if (next_) { next_->mark(); }
+		}
 	public:
 		Frame(Frame *next): next_ { next } { }
 		void insert(const std::string &key, Element *value);
 		Element *get(const std::string &key) const;
+		std::ostream &write(std::ostream &out) const override {
+			return out << "#frame";
+		}
 };
 
 void Frame::insert(const std::string &key, Element *value) {
@@ -139,6 +176,12 @@ class Procedure : public Element {
 		Element *args_;
 		Element *body_;
 		Frame *env_;
+	protected:
+		void propagate_mark() override {
+			if (args_) { args_->mark(); }
+			if (body_) { body_->mark(); }
+			if (env_) { env_->mark(); }
+		}
 	public:
 		Procedure(Element *args, Element *body, Frame *env):
 			args_ { args }, body_ { body }, env_ { env }
@@ -430,6 +473,48 @@ Element *Plus_Primitive::apply(Element *args) {
 
 Frame initial_frame { nullptr };
 
+class Garbage_Collect_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Garbage_Collect_Primitive::apply(Element *args) {
+	current_mark = ! current_mark;
+	initial_frame.mark();
+	int kept { 0 };
+	int collected { 0 };
+	Element *prev { nullptr };
+	Element *cur { all_elements };
+	while (cur) {
+		if (cur != &Null && cur->get_mark() != current_mark) {
+			++collected;
+			auto tmp { cur->next() };
+			delete cur;
+			cur = tmp;
+			if (prev) {
+				prev->set_next(cur);	
+			} else { all_elements = cur; }
+		} else {
+			++kept;
+			prev = cur;
+			cur = cur->next();
+		}
+	}
+	return new Pair {
+		new Symbol { "collected" },
+		new Pair {
+			new Integer { collected },
+			new Pair {
+				new Symbol { "kept" },
+				new Pair {
+					new Integer { kept },
+					&Null
+				}
+			}
+		}
+	};
+}
+
 void process_stream(std::istream &in, std::ostream *out, bool prompt) {
 	if (prompt && out) { *out << "? "; }
 	ch = in.get();
@@ -460,6 +545,7 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("list", new List_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("+", new Plus_Primitive());
+	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 
 	{
 		std::istringstream s { setup };
