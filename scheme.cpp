@@ -157,6 +157,48 @@ Pair *eval_list(Pair *exp, Frame *env) {
 	}
 }
 
+inline bool is_define_special(Pair *lst) {
+	auto sym = dynamic_cast<Symbol *>(lst->head());
+	return sym != nullptr && sym->value() == "define";
+}
+
+Element *cadr(Pair *lst) {
+	if (! lst) {
+		std::cerr << "cadr: no list\n";
+		return nullptr;
+	}
+	auto nxt { dynamic_cast<Pair *>(lst->rest()) };
+	if (! nxt) {
+		std::cerr << "cadr: no next pair\n";
+		return nullptr;
+	}
+	return nxt->head();
+}
+
+inline Symbol *define_key(Pair *lst) {
+	auto sym { dynamic_cast<Symbol *>(cadr(lst)) };
+	if (! sym) { std::cerr << "define: no key symbol\n"; }
+	return sym;
+}
+
+Element *caddr(Pair *lst) {
+	auto nxt { dynamic_cast<Pair *>(lst->rest()) };
+	if (! nxt) {
+		std::cerr << "caddr: no next pair\n";
+		return nullptr;
+	}
+	auto nxxt { dynamic_cast<Pair *>(nxt->rest()) };
+	if (! nxxt) {
+		std::cerr << "caddr: no pair after cadr\n";
+		return nullptr;
+	}
+	return nxxt->head();
+}
+
+inline Element *define_value(Pair *lst, Frame *env) {
+	return eval(caddr(lst), env);
+}
+
 Element *eval(Element *exp, Frame *env) {
 	if (! exp || exp == &Null) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
@@ -168,6 +210,16 @@ Element *eval(Element *exp, Frame *env) {
 	}
 	auto lst_value { dynamic_cast<Pair *>(exp) };
 	if (lst_value) {
+		if (is_define_special(lst_value)) {
+			auto key { define_key(lst_value) };
+			auto value { define_value(lst_value, env) };
+			if (! key || ! value) {
+				std::cerr << "incomplete define " << lst_value << "\n";
+				return nullptr;
+			}
+			env->insert(key->value(), value);
+			return value;
+		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(lst->head(), lst->rest());
 	}
