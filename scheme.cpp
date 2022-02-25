@@ -157,22 +157,31 @@ Pair *eval_list(Pair *exp, Frame *env) {
 	}
 }
 
+Element *car(Element *lst) {
+	auto cur { dynamic_cast<Pair *>(lst) };
+	if (! cur) {
+		std::cerr << "car: no list: " << lst << "\n";
+		return nullptr;
+	}
+	return cur->head();
+}
+
+Element *cdr(Element *lst) {
+	auto cur { dynamic_cast<Pair *>(lst) };
+	if (! cur) {
+		std::cerr << "cdr: no list: " << lst << "\n";
+		return nullptr;
+	}
+	return cur->rest();
+}
+
 inline bool is_define_special(Pair *lst) {
 	auto sym = dynamic_cast<Symbol *>(lst->head());
 	return sym != nullptr && sym->value() == "define";
 }
 
 Element *cadr(Pair *lst) {
-	if (! lst) {
-		std::cerr << "cadr: no list\n";
-		return nullptr;
-	}
-	auto nxt { dynamic_cast<Pair *>(lst->rest()) };
-	if (! nxt) {
-		std::cerr << "cadr: no next pair\n";
-		return nullptr;
-	}
-	return nxt->head();
+	return car(cdr(lst));
 }
 
 inline Symbol *define_key(Pair *lst) {
@@ -182,17 +191,7 @@ inline Symbol *define_key(Pair *lst) {
 }
 
 Element *caddr(Pair *lst) {
-	auto nxt { dynamic_cast<Pair *>(lst->rest()) };
-	if (! nxt) {
-		std::cerr << "caddr: no next pair\n";
-		return nullptr;
-	}
-	auto nxxt { dynamic_cast<Pair *>(nxt->rest()) };
-	if (! nxxt) {
-		std::cerr << "caddr: no pair after cadr\n";
-		return nullptr;
-	}
-	return nxxt->head();
+	return car(cdr(cdr(lst)));
 }
 
 inline Element *define_value(Pair *lst, Frame *env) {
@@ -227,31 +226,81 @@ Element *eval(Element *exp, Frame *env) {
 	return nullptr;
 }
 
+class Car_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Car_Primitive::apply(Element *args) {
+	auto cur { dynamic_cast<Pair *>(args) };
+	if (! cur) {
+		std::cerr << "car: no args: " << args << "\n";
+		return nullptr;
+	}
+	return car(cur->head());
+}
+
+class Cdr_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Cdr_Primitive::apply(Element *args) {
+	auto cur { dynamic_cast<Pair *>(args) };
+	if (! cur) {
+		std::cerr << "cdr: no args: " << args << "\n";
+		return nullptr;
+	}
+	return cdr(cur->head());
+}
+
+class List_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *List_Primitive::apply(Element *args) {
+	return args;
+}
+
+class Cons_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Cons_Primitive::apply(Element *args) {
+	Element *first { car(args) };
+	Element *nxt { cdr(args) };
+	Element *second { car(nxt) };
+	nxt = cdr(nxt);
+	if (! first || ! second || nxt != &Null) {
+		std::cerr << "cons: wrong arguments: " << args << "\n";
+		return nullptr;
+	}
+	return new Pair { first, second };
+}
+
 class Plus_Primitive : public Primitive {
 	public:
 		Element *apply(Element *args) override;
 };
 
+
 Element *Plus_Primitive::apply(Element *args) {
 	int sum { 0 };
-	Pair *cur { dynamic_cast<Pair *>(args) };
-	if (! cur) {
-		std::cerr << "+: no arg list: " << args << "\n";
-		return nullptr;
-	}
-	while (cur && cur != &Null) {
-		auto v { dynamic_cast<Integer *>(cur->head()) };
+
+	Element *cur { args };
+	for (; cur && cur != &Null; cur = cdr(cur)) {
+		auto v { dynamic_cast<Integer *>(car(cur)) };
 		if (! v) {
-			std::cerr << "+: no number: " << cur->head() << "\n";
+			std::cerr << "+: no number: " << car(cur) << "\n";
 			return nullptr;
 		}
 		sum += v->value();
-		auto nxt { dynamic_cast<Pair *>(cur->rest()) };
-		if (! nxt && cur->rest()) {
-			std::cerr << "+: no list: " << cur->rest() << "\n";
-			return nullptr;
-		}
-		cur = nxt;
+	}
+	if (! cur) {
+		std::cerr << "+: wrong arguments: " << args << "\n";
+		return nullptr;
 	}
 	return new Integer(sum);
 }
@@ -259,6 +308,10 @@ Element *Plus_Primitive::apply(Element *args) {
 int main() {
 	Frame initial_frame { nullptr };
 	initial_frame.insert("nil", &Null);
+	initial_frame.insert("car", new Car_Primitive());
+	initial_frame.insert("cdr", new Cdr_Primitive());
+	initial_frame.insert("list", new List_Primitive());
+	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("+", new Plus_Primitive());
 
 	for (;;) {
