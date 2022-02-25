@@ -115,7 +115,7 @@ class Frame {
 };
 
 void Frame::insert(const std::string &key, Element *value) {
-	elements_.emplace(key, value);
+	elements_[key] = value;
 }
 
 Element *Frame::get(const std::string &key) const {
@@ -135,27 +135,20 @@ std::ostream &Primitive::write(std::ostream &out) const {
 	return out << "#primitive";
 }
 
-Element *apply(Element *op, Element *operands) {
-	auto prim { dynamic_cast<Primitive *>(op) };
-	if (prim) {
-		return prim->apply(operands);
-	}
-	std::cerr << "unknown operator " << op << "\n";
-	return nullptr;
-}
+class Procedure : public Element {
+		Element *args_;
+		Element *body_;
+		Frame *env_;
+	public:
+		Procedure(Element *args, Element *body, Frame *env):
+			args_ { args }, body_ { body }, env_ { env }
+		{ }
+
+		Element *apply(Element *arg_values);
+		std::ostream &write(std::ostream &out) const override;
+};
 
 Element *eval(Element *exp, Frame *env);
-
-Pair *eval_list(Pair *exp, Frame *env) {
-	if (! exp || exp == &Null) { return exp; }
-	auto head { eval(exp->head(), env) };
-	auto rest { dynamic_cast<Pair *>(exp->rest()) };
-	if (rest) {
-		return new Pair { head, eval_list(rest, env) };
-	} else {
-		return new Pair { head, eval(exp->rest(), env) };
-	}
-}
 
 Element *car(Element *lst) {
 	auto cur { dynamic_cast<Pair *>(lst) };
@@ -175,8 +168,99 @@ Element *cdr(Element *lst) {
 	return cur->rest();
 }
 
+std::ostream &Procedure::write(std::ostream &out) const {
+	out << "(lambda " << args_;
+	for (Element *cur { body_ }; cur && cur != &Null; cur = cdr(cur)) {
+		auto v { car(cur) };
+		if (v) { out << ' ' << v; } else { out << " #invalid"; }
+	}
+	out << ')';
+	return out;
+}
+
+Element *Procedure::apply(Element *arg_values) {
+	auto new_env { new Frame { env_ } };
+
+	Element *cur { args_ };
+	auto cur_pair { dynamic_cast<Pair *>(cur) };
+	for (; cur_pair && cur_pair != &Null; cur = cdr(cur), cur_pair = dynamic_cast<Pair *>(cur)) {
+		auto sym { dynamic_cast<Symbol *>(car(cur)) };
+		if (! sym) {
+			std::cerr << "proc: no argument symbol " << cur << "\n";
+			return nullptr;
+		}
+		auto value { car(arg_values) };
+		if (! value) {
+			std::cerr << "proc: no argument value for " << cur << "\n";
+			return nullptr;
+		}
+		new_env->insert(sym->value(), value);
+		arg_values = cdr(arg_values);
+	}
+	if (! cur) {
+		std::cerr << "proc: error parsing arguments " << args_ << "\n";
+		return nullptr;
+	}
+	if (cur != &Null) {
+		auto sym { dynamic_cast<Symbol *>(cur) };
+		if (! sym) {
+			std::cerr << "proc: no argument symbol " << cur << "\n";
+			return nullptr;
+		}
+		if (! arg_values) {
+			std::cerr << "proc: no fill arg values\n";
+			return nullptr;
+		}
+		new_env->insert(sym->value(), arg_values);
+	}
+
+	cur = body_;
+	cur_pair = dynamic_cast<Pair *>(cur);
+	Element *value = &Null;
+	for (; cur_pair && cur_pair != &Null; cur = cdr(cur), cur_pair = dynamic_cast<Pair *>(cur)) {
+		Element *exp { car(cur_pair) };
+		if (! exp) {
+			std::cerr << "proc: no statement " << cur_pair << "\n";
+			return nullptr;
+		}
+		value = eval(exp, new_env);
+		if (! value) {
+			std::cerr << "proc: can't eval " << exp << "\n";
+		}
+	}
+	if (cur != &Null) {
+		std::cerr << "proc: error in body " << body_ << "\n";
+		return nullptr;
+	}
+	return value;
+}
+
+Element *apply(Element *op, Element *operands) {
+	auto prim { dynamic_cast<Primitive *>(op) };
+	if (prim) {
+		return prim->apply(operands);
+	}
+	auto proc { dynamic_cast<Procedure *>(op) };
+	if (proc) {
+		return proc->apply(operands);
+	}
+	std::cerr << "unknown operator " << op << "\n";
+	return nullptr;
+}
+
+Pair *eval_list(Pair *exp, Frame *env) {
+	if (! exp || exp == &Null) { return exp; }
+	auto head { eval(exp->head(), env) };
+	auto rest { dynamic_cast<Pair *>(exp->rest()) };
+	if (rest) {
+		return new Pair { head, eval_list(rest, env) };
+	} else {
+		return new Pair { head, eval(exp->rest(), env) };
+	}
+}
+
 inline bool is_define_special(Pair *lst) {
-	auto sym = dynamic_cast<Symbol *>(lst->head());
+	auto sym { dynamic_cast<Symbol *>(car(lst)) };
 	return sym != nullptr && sym->value() == "define";
 }
 
@@ -185,9 +269,19 @@ Element *cadr(Pair *lst) {
 }
 
 inline Symbol *define_key(Pair *lst) {
-	auto sym { dynamic_cast<Symbol *>(cadr(lst)) };
-	if (! sym) { std::cerr << "define: no key symbol\n"; }
-	return sym;
+	auto first { cadr(lst) };
+	auto sym { dynamic_cast<Symbol *>(first) };
+	if (sym) { return sym; }
+	auto args { dynamic_cast<Pair *>(first) };
+	if (args) {
+		auto name { dynamic_cast<Symbol *>(car(args)) };
+		if (! name) {
+			std::cerr << "define: no function name " << first << "\n";
+		}
+		return name;
+	}
+	std::cerr << "define: no key symbol " << lst << "\n";
+	return nullptr;
 }
 
 Element *caddr(Pair *lst) {
@@ -195,7 +289,27 @@ Element *caddr(Pair *lst) {
 }
 
 inline Element *define_value(Pair *lst, Frame *env) {
-	return eval(caddr(lst), env);
+	auto args { dynamic_cast<Pair *>(cadr(lst)) };
+	if (args) {
+		return new Procedure {
+			cdr(args), cdr(cdr(lst)), env
+		};
+	} else {
+		return eval(caddr(lst), env);
+	}
+}
+
+inline bool is_lambda_special(Pair *lst) {
+	auto sym { dynamic_cast<Symbol *>(car(lst)) };
+	return sym != nullptr && sym->value() == "lambda";
+}
+
+inline Element *lambda_args(Pair *lst) {
+	return cadr(lst);
+}
+
+inline Element *lambda_body(Pair *lst) {
+	return cdr(cdr(lst));
 }
 
 Element *eval(Element *exp, Frame *env) {
@@ -218,6 +332,15 @@ Element *eval(Element *exp, Frame *env) {
 			}
 			env->insert(key->value(), value);
 			return value;
+		}
+		if (is_lambda_special(lst_value)) {
+			auto args { lambda_args(lst_value) };
+			auto body { lambda_body(lst_value) };
+			if (! args || ! body) {
+				std::cerr << "incomplete lambda " << lst_value << "\n";
+				return nullptr;
+			}
+			return new Procedure(args, body, env);
 		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(lst->head(), lst->rest());
