@@ -468,7 +468,103 @@ Element *Plus_Primitive::apply(Element *args) {
 		std::cerr << "+: wrong arguments: " << args << "\n";
 		return nullptr;
 	}
-	return new Integer(sum);
+	return new Integer { sum };
+}
+
+class Minus_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Minus_Primitive::apply(Element *args) {
+	int sum { 0 };
+	
+	Element *cur { args };
+	if (cur == &Null) { return new Integer(sum); }
+	auto first { dynamic_cast<Integer *>(car(cur)) };
+	if (! first) {
+		std::cerr << "-: no number: " << car(cur) << "\n";
+		return nullptr;
+	}
+	cur = cdr(cur);
+	if (cur == &Null) { return new Integer(-first->value()); }
+	sum = first->value();
+	for (; cur && cur != &Null; cur = cdr(cur)) {
+		auto vv { dynamic_cast<Integer *>(car(cur)) };
+		if (! vv) {
+			std::cerr << "-: no number: " << car(cur) << "\n";
+			return nullptr;
+		}
+		sum -= vv->value();
+	}
+	if (! cur) {
+		std::cerr << "-: wrong arguments: " << args << "\n";
+		return nullptr;
+	}
+	return new Integer { sum };
+}
+
+class Times_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+
+Element *Times_Primitive::apply(Element *args) {
+	int product { 1 };
+
+	Element *cur { args };
+	for (; cur && cur != &Null; cur = cdr(cur)) {
+		auto v { dynamic_cast<Integer *>(car(cur)) };
+		if (! v) {
+			std::cerr << "*: no number: " << car(cur) << "\n";
+			return nullptr;
+		}
+		product *= v->value();
+	}
+	if (! cur) {
+		std::cerr << "*: wrong arguments: " << args << "\n";
+		return nullptr;
+	}
+	return new Integer { product };
+}
+
+class Divide_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Divide_Primitive::apply(Element *args) {
+	int product { 1 };
+	
+	Element *cur { args };
+	auto first { dynamic_cast<Integer *>(car(cur)) };
+	if (! first) {
+		std::cerr << "/: no number: " << car(cur) << "\n";
+		return nullptr;
+	}
+	product = first->value();
+	cur = cdr(cur);
+	if (cur == &Null) { 
+		if (product == 0) {
+			std::cerr << "/: divide by 0 " << first << "\n";
+			return nullptr;
+		}
+		return new Integer(1/product);
+	}
+	for (; cur && cur != &Null; cur = cdr(cur)) {
+		auto vv { dynamic_cast<Integer *>(car(cur)) };
+		if (! vv) {
+			std::cerr << "-: no number: " << car(cur) << "\n";
+			return nullptr;
+		}
+		product /= vv->value();
+	}
+	if (! cur) {
+		std::cerr << "/: wrong arguments: " << args << "\n";
+		return nullptr;
+	}
+	return new Integer { product };
 }
 
 Frame initial_frame { nullptr };
@@ -545,6 +641,9 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("list", new List_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("+", new Plus_Primitive());
+	initial_frame.insert("-", new Minus_Primitive());
+	initial_frame.insert("*", new Times_Primitive());
+	initial_frame.insert("/", new Divide_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 
 	{
