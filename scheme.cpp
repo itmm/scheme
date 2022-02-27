@@ -69,6 +69,8 @@ class Pair : public Element {
 };
 
 Pair Null { &Null, &Null };
+#define False Null
+Integer True { 1 };
 
 std::ostream &Pair::write(std::ostream &out) const {
 	out << '(';
@@ -221,32 +223,40 @@ class Procedure : public Element {
 
 Element *eval(Element *exp, Frame *env);
 
+Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
+	std::cerr << fn << ": " << msg;
+	if (exp) { std::cerr << " (" << exp << ')'; }
+	std::cerr << '\n';
+	return nullptr;
+}
+
+#define ASSERT(CND, FN) if (! (CND)) { err((FN), "no " #CND); return nullptr; }
+
 Element *car(Element *lst) {
-	auto cur { dynamic_cast<Pair *>(lst) };
-	if (! cur) {
-		std::cerr << "car: no list: " << lst << "\n";
-		return nullptr;
-	}
-	return cur->head();
+	auto pair { dynamic_cast<Pair *>(lst) };
+	ASSERT(pair, "car");
+	return pair->head();
 }
 
 Element *cdr(Element *lst) {
-	auto cur { dynamic_cast<Pair *>(lst) };
-	if (! cur) {
-		std::cerr << "cdr: no list: " << lst << "\n";
-		return nullptr;
-	}
-	return cur->rest();
+	auto pair { dynamic_cast<Pair *>(lst) };
+	ASSERT(pair, "cdr");
+	return pair->rest();
 }
 
 std::ostream &Procedure::write(std::ostream &out) const {
 	out << "(lambda " << args_;
 	for (Element *cur { body_ }; cur && cur != &Null; cur = cdr(cur)) {
 		auto v { car(cur) };
-		if (v) { out << ' ' << v; } else { out << " #invalid"; }
+		out << ' ' << v;
 	}
 	out << ')';
 	return out;
+}
+
+bool is_null(Element *element) {
+	if (! element) { err("is_null", "no argument"); }
+	return element == &Null;
 }
 
 Element *Procedure::apply(Element *arg_values) {
@@ -254,69 +264,45 @@ Element *Procedure::apply(Element *arg_values) {
 
 	Element *cur { args_ };
 	auto cur_pair { dynamic_cast<Pair *>(cur) };
-	for (; cur_pair && cur_pair != &Null; cur = cdr(cur), cur_pair = dynamic_cast<Pair *>(cur)) {
+	for (; cur_pair && cur_pair != &Null; cur = cdr(cur),
+		cur_pair = dynamic_cast<Pair *>(cur)
+	) {
 		auto sym { dynamic_cast<Symbol *>(car(cur)) };
-		if (! sym) {
-			std::cerr << "proc: no argument symbol " << cur << "\n";
-			return nullptr;
-		}
+		ASSERT(sym, "procedure");
 		auto value { car(arg_values) };
-		if (! value) {
-			std::cerr << "proc: no argument value for " << cur << "\n";
-			return nullptr;
-		}
+		ASSERT(value, "procedure");
 		new_env->insert(sym->value(), value);
 		arg_values = cdr(arg_values);
 	}
-	if (! cur) {
-		std::cerr << "proc: error parsing arguments " << args_ << "\n";
-		return nullptr;
-	}
+	ASSERT(cur, "procedure");
 	if (cur != &Null) {
 		auto sym { dynamic_cast<Symbol *>(cur) };
-		if (! sym) {
-			std::cerr << "proc: no argument symbol " << cur << "\n";
-			return nullptr;
-		}
-		if (! arg_values) {
-			std::cerr << "proc: no fill arg values\n";
-			return nullptr;
-		}
+		ASSERT(sym, "procedure");
+		ASSERT(arg_values, "procedure");
 		new_env->insert(sym->value(), arg_values);
 	}
 
 	cur = body_;
 	cur_pair = dynamic_cast<Pair *>(cur);
 	Element *value = &Null;
-	for (; cur_pair && cur_pair != &Null; cur = cdr(cur), cur_pair = dynamic_cast<Pair *>(cur)) {
-		Element *exp { car(cur_pair) };
-		if (! exp) {
-			std::cerr << "proc: no statement " << cur_pair << "\n";
-			return nullptr;
-		}
-		value = eval(exp, new_env);
-		if (! value) {
-			std::cerr << "proc: can't eval " << exp << "\n";
-		}
+	for (; cur_pair && cur_pair != &Null; cur = cdr(cur),
+		cur_pair = dynamic_cast<Pair *>(cur)
+	) {
+		Element *statement { car(cur_pair) };
+		ASSERT(statement, "procedure");
+		value = eval(statement, new_env);
+		ASSERT(value, "procedure");
 	}
-	if (cur != &Null) {
-		std::cerr << "proc: error in body " << body_ << "\n";
-		return nullptr;
-	}
+	ASSERT(is_null(cur), "procedure");
 	return value;
 }
 
 Element *apply(Element *op, Element *operands) {
 	auto prim { dynamic_cast<Primitive *>(op) };
-	if (prim) {
-		return prim->apply(operands);
-	}
+	if (prim) { return prim->apply(operands); }
 	auto proc { dynamic_cast<Procedure *>(op) };
-	if (proc) {
-		return proc->apply(operands);
-	}
-	std::cerr << "unknown operator " << op << "\n";
-	return nullptr;
+	if (proc) { return proc->apply(operands); }
+	ASSERT(false, "apply");
 }
 
 Pair *eval_list(Pair *exp, Frame *env) {
@@ -350,29 +336,32 @@ inline Symbol *define_key(Pair *lst) {
 	auto args { dynamic_cast<Pair *>(first) };
 	if (args) {
 		auto name { dynamic_cast<Symbol *>(car(args)) };
-		if (! name) {
-			std::cerr << "define: no function name " << first << "\n";
-		}
+		ASSERT(name, "define_key");
 		return name;
 	}
-	std::cerr << "define: no key symbol " << lst << "\n";
-	return nullptr;
+	ASSERT(false, "define key");
+}
+
+Element *cddr(Element *lst) {
+	return cdr(cdr(lst));
 }
 
 Element *caddr(Element *lst) {
-	return car(cdr(cdr(lst)));
+	return car(cddr(lst));
+}
+
+Element *cdddr(Element *lst) {
+	return cdr(cddr(lst));
 }
 
 Element *cadddr(Element *lst) {
-	return car(cdr(cdr(cdr(lst))));
+	return car(cdddr(lst));
 }
 
 inline Element *define_value(Pair *lst, Frame *env) {
 	auto args { dynamic_cast<Pair *>(cadr(lst)) };
 	if (args) {
-		return new Procedure {
-			cdr(args), cdr(cdr(lst)), env
-		};
+		return new Procedure { cdr(args), cddr(lst), env };
 	} else {
 		return eval(caddr(lst), env);
 	}
@@ -387,7 +376,7 @@ inline Element *lambda_args(Pair *lst) {
 }
 
 inline Element *lambda_body(Pair *lst) {
-	return cdr(cdr(lst));
+	return cddr(lst);
 }
 
 inline bool is_if_special(Pair *lst) {
@@ -415,34 +404,21 @@ Element *build_cond(Element *lst) {
 	auto expr { car(lst) };
 	auto cond { car(expr) };
 	auto cons { cdr(expr) };
-	if (! cond || ! cons) {
-		std::cerr << "cond: invalid pair " << lst << "\n";
-		return nullptr;
-	}
+	ASSERT(cond && cons, "cond");
 	auto sym { dynamic_cast<Symbol *>(cond) };
 	if (sym && sym->value() == "else") {
 		if (cdr(lst) != &Null) {
-			std::cerr << "cond: else not in last case\n";
-			return nullptr;
+			return err("cond", "else not in last case");
 		}
-		return new Pair {
-			new Symbol { "begin" },
-			cons
-		};
+		return new Pair { new Symbol { "begin" }, cons };
 	}
 	return new Pair {
 		new Symbol { "if" },
 		new Pair {
 			cond,
 			new Pair {
-				new Pair {
-					new Symbol { "begin" },
-					cons
-				},
-				new Pair {
-					build_cond(cdr(lst)),
-					&Null
-				}
+				new Pair { new Symbol { "begin" }, cons },
+				new Pair { build_cond(cdr(lst)), &Null }
 			}
 		}
 	};
@@ -458,6 +434,22 @@ inline bool is_and_special(Pair *lst) {
 
 inline bool is_or_special(Pair *lst) {
 	return is_tagged_list(lst, "or");
+}
+
+bool is_true(Element *value) {
+	if (! value) { err("is_true", "no value"); }
+	return value && value != &Null;
+}
+
+bool is_false(Element *value) {
+	if (! value) { err("is_false", "no value"); }
+	return value == &Null;
+}
+
+Element *to_bool(bool cond) {
+	return cond ?
+		dynamic_cast<Element *>(&True) :
+		dynamic_cast<Element *>(&False);
 }
 
 Element *eval(Element *exp, Frame *env) {
@@ -476,29 +468,20 @@ Element *eval(Element *exp, Frame *env) {
 		if (is_define_special(lst_value)) {
 			auto key { define_key(lst_value) };
 			auto value { define_value(lst_value, env) };
-			if (! key || ! value) {
-				std::cerr << "incomplete define " << lst_value << "\n";
-				return nullptr;
-			}
+			ASSERT(key && value, "define");
 			env->insert(key->value(), value);
 			return value;
 		}
 		if (is_lambda_special(lst_value)) {
 			auto args { lambda_args(lst_value) };
 			auto body { lambda_body(lst_value) };
-			if (! args || ! body) {
-				std::cerr << "incomplete lambda " << lst_value << "\n";
-				return nullptr;
-			}
+			ASSERT(args && body, "lambda");
 			return new Procedure(args, body, env);
 		}
 		if (is_if_special(lst_value)) {
 			auto condition { eval(if_condition(lst_value), env) };
-			if (! condition) {
-				std::cerr << "if: invalid condition " << lst_value << "\n";
-				return nullptr;
-			}
-			if (condition != &Null) {
+			ASSERT(condition, "if");
+			if (is_true(condition)) {
 				return eval(if_consequence(lst_value), env);
 			} else {
 				return eval(if_alternative(lst_value), env);
@@ -506,11 +489,7 @@ Element *eval(Element *exp, Frame *env) {
 		}
 		if (is_cond_special(lst_value)) {
 			auto expr { build_cond(cdr(lst_value)) };
-			if (! expr) {
-				std::cerr << "cond: invalid expression " << lst_value << "\n";
-				return nullptr;
-			}
-			std::cerr << expr << "\n";
+			ASSERT(expr, "cond");
 			return eval(expr, env);
 		}
 		if (is_begin_special(lst_value)) {
@@ -518,44 +497,34 @@ Element *eval(Element *exp, Frame *env) {
 			auto cur { cdr(lst_value) };
 			for (; cur && cur != &Null; cur = cdr(cur)) {
 				result = eval(car(cur), env);
-				if (! result) {
-					std::cerr << "begin: can't eval " << car(cur) << "\n";
-					break;
-				}
+				ASSERT(result, "begin");
 			}
 			return result;
 		}
 		if (is_and_special(lst_value)) {
 			auto cur { cdr(lst_value) };
-			Element *result { new Integer { 1 } };
+			Element *result { &True };
 			for (; cur && cur != &Null; cur = cdr(cur)) {
 				result = eval(car(cur), env);
-				if (! result) {
-					std::cerr << "and: can't eval " << car(cur) << "\n";
-					break;
-				}
-				if (result == &Null) { break; }
+				ASSERT(result, "and");
+				if (is_false(result)) { break; }
 			}
 			return result;
 		}
 		if (is_or_special(lst_value)) {
 			auto cur { cdr(lst_value) };
-			Element *result { &Null };
+			Element *result { &False };
 			for (; cur && cur != &Null; cur = cdr(cur)) {
 				result = eval(car(cur), env);
-				if (! result) {
-					std::cerr << "or: can't eval " << car(cur) << "\n";
-					break;
-				}
-				if (result != &Null) { break; }
+				ASSERT(result, "or");
+				if (is_true(result)) { break; }
 			}
 			return result;
 		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(lst->head(), lst->rest());
 	}
-	std::cerr << "unknown expression " << exp << "\n";
-	return nullptr;
+	ASSERT(false, "eval");
 }
 
 class Car_Primitive : public Primitive {
@@ -564,12 +533,8 @@ class Car_Primitive : public Primitive {
 };
 
 Element *Car_Primitive::apply(Element *args) {
-	auto cur { dynamic_cast<Pair *>(args) };
-	if (! cur) {
-		std::cerr << "car: no args: " << args << "\n";
-		return nullptr;
-	}
-	return car(cur->head());
+	ASSERT(is_null(cdr(args)), "car");
+	return car(car(args));
 }
 
 class Cdr_Primitive : public Primitive {
@@ -578,12 +543,8 @@ class Cdr_Primitive : public Primitive {
 };
 
 Element *Cdr_Primitive::apply(Element *args) {
-	auto cur { dynamic_cast<Pair *>(args) };
-	if (! cur) {
-		std::cerr << "cdr: no args: " << args << "\n";
-		return nullptr;
-	}
-	return cdr(cur->head());
+	ASSERT(is_null(cdr(args)), "cdr");
+	return cdr(car(args));
 }
 
 class List_Primitive : public Primitive {
@@ -605,10 +566,7 @@ Element *Cons_Primitive::apply(Element *args) {
 	Element *nxt { cdr(args) };
 	Element *second { car(nxt) };
 	nxt = cdr(nxt);
-	if (! first || ! second || nxt != &Null) {
-		std::cerr << "cons: wrong arguments: " << args << "\n";
-		return nullptr;
-	}
+	ASSERT(first && second && is_null(nxt), "cons");
 	return new Pair { first, second };
 }
 
@@ -624,7 +582,7 @@ Element *Plus_Primitive::apply(Element *args) {
 	bool is_float { false };
 
 	Element *cur { args };
-	for (; cur && cur != &Null; cur = cdr(cur)) {
+	for (; ! is_null(cur); cur = cdr(cur)) {
 		if (is_float) {
 			auto vi { dynamic_cast<Integer *>(car(cur)) };
 			if (vi) {
@@ -649,13 +607,9 @@ Element *Plus_Primitive::apply(Element *args) {
 				continue;
 			}
 		}
-		std::cerr << "+: no number: " << car(cur) << "\n";
-		return nullptr;
+		ASSERT(false, "+");
 	}
-	if (! cur) {
-		std::cerr << "+: wrong arguments: " << args << "\n";
-		return nullptr;
-	}
+	ASSERT(cur, "+");
 	if (is_float) {
 		return new Float { f_sum };
 	}
@@ -673,25 +627,16 @@ Element *Minus_Primitive::apply(Element *args) {
 	Element *cur { args };
 	if (cur == &Null) { return new Integer(sum); }
 	auto first { dynamic_cast<Integer *>(car(cur)) };
-	if (! first) {
-		std::cerr << "-: no number: " << car(cur) << "\n";
-		return nullptr;
-	}
+	ASSERT(first, "-");
 	cur = cdr(cur);
 	if (cur == &Null) { return new Integer(-first->value()); }
 	sum = first->value();
-	for (; cur && cur != &Null; cur = cdr(cur)) {
+	for (; ! is_null(cur); cur = cdr(cur)) {
 		auto vv { dynamic_cast<Integer *>(car(cur)) };
-		if (! vv) {
-			std::cerr << "-: no number: " << car(cur) << "\n";
-			return nullptr;
-		}
+		ASSERT(vv, "-");
 		sum -= vv->value();
 	}
-	if (! cur) {
-		std::cerr << "-: wrong arguments: " << args << "\n";
-		return nullptr;
-	}
+	ASSERT(cur, "-");
 	return new Integer { sum };
 }
 
@@ -707,7 +652,7 @@ Element *Times_Primitive::apply(Element *args) {
 	bool is_float { false };
 
 	Element *cur { args };
-	for (; cur && cur != &Null; cur = cdr(cur)) {
+	for (; ! is_null(cur); cur = cdr(cur)) {
 		if (is_float) {
 			auto vi { dynamic_cast<Integer *>(car(cur)) };
 			if (vi) {
@@ -733,13 +678,9 @@ Element *Times_Primitive::apply(Element *args) {
 				continue;
 			}
 		}
-		std::cerr << "*: no number: " << car(cur) << "\n";
-		return nullptr;
+		ASSERT(false, "*");
 	}
-	if (! cur) {
-		std::cerr << "*: wrong arguments: " << args << "\n";
-		return nullptr;
-	}
+	ASSERT(cur, "*");
 	if (is_float) {
 		return new Float { f_product };
 	}
@@ -756,49 +697,21 @@ Element *Divide_Primitive::apply(Element *args) {
 	
 	Element *cur { args };
 	auto first { dynamic_cast<Integer *>(car(cur)) };
-	if (! first) {
-		std::cerr << "/: no number: " << car(cur) << "\n";
-		return nullptr;
-	}
+	ASSERT(first, "/");
 	product = first->value();
 	cur = cdr(cur);
 	if (cur == &Null) { 
-		if (product == 0) {
-			std::cerr << "/: divide by 0 " << first << "\n";
-			return nullptr;
-		}
+		ASSERT(product != 0, "/");
 		return new Integer(1/product);
 	}
 	for (; cur && cur != &Null; cur = cdr(cur)) {
 		auto vv { dynamic_cast<Integer *>(car(cur)) };
-		if (! vv) {
-			std::cerr << "-: no number: " << car(cur) << "\n";
-			return nullptr;
-		}
+		ASSERT(vv, "/");
+		ASSERT(vv->value(), "/");
 		product /= vv->value();
 	}
-	if (! cur) {
-		std::cerr << "/: wrong arguments: " << args << "\n";
-		return nullptr;
-	}
+	ASSERT(cur, "/");
 	return new Integer { product };
-}
-
-class Not_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-};
-
-Element *Not_Primitive::apply(Element *args) {
-	if (! args) {
-		std::cerr << "not: invalid args\n";
-		return nullptr;
-	}
-	if (car(args) == &Null) {
-		return new Integer { 1 };
-	} else {
-		return &Null;
-	}
 }
 
 class Less_Primitive : public Primitive {
@@ -809,46 +722,11 @@ class Less_Primitive : public Primitive {
 Element *Less_Primitive::apply(Element *args) {
 	Element *first { car(args) };
 	Element *second { cadr(args) };
-	if (cdr(cdr(args)) != &Null || ! first || ! second) {
-		std::cerr << "<: argument error: " << args << "\n";
-		return nullptr;
-	}
+	ASSERT(first && second && is_null(cddr(args)), "<");
 	auto first_i { dynamic_cast<Integer *>(first) };
 	auto second_i { dynamic_cast<Integer *>(second) };
-	if (first_i && second_i) {
-		if (first_i->value() < second_i->value()) {
-			return new Integer { 1 };
-		} else {
-			return &Null;
-		}
-	}
-	std::cerr << "<: invalid argument types: " << args << "\n";
-	return nullptr;
-}
-
-class Greater_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-};
-
-Element *Greater_Primitive::apply(Element *args) {
-	Element *first { car(args) };
-	Element *second { cadr(args) };
-	if (cdr(cdr(args)) != &Null || ! first || ! second) {
-		std::cerr << ">: argument error: " << args << "\n";
-		return nullptr;
-	}
-	auto first_i { dynamic_cast<Integer *>(first) };
-	auto second_i { dynamic_cast<Integer *>(second) };
-	if (first_i && second_i) {
-		if (first_i->value() > second_i->value()) {
-			return new Integer { 1 };
-		} else {
-			return &Null;
-		}
-	}
-	std::cerr << "<: invalid argument types: " << args << "\n";
-	return nullptr;
+	ASSERT(first_i && second_i, "<");
+	return to_bool(first_i->value() < second_i->value());
 }
 
 class Equal_Primitive : public Primitive {
@@ -859,21 +737,13 @@ class Equal_Primitive : public Primitive {
 Element *Equal_Primitive::apply(Element *args) {
 	Element *first { car(args) };
 	Element *second { cadr(args) };
-	if (cdr(cdr(args)) != &Null || ! first || ! second) {
-		std::cerr << "=: argument error: " << args << "\n";
-		return nullptr;
-	}
+	ASSERT(first && second && is_null(cddr(args)), "=");
 	auto first_i { dynamic_cast<Integer *>(first) };
 	auto second_i { dynamic_cast<Integer *>(second) };
 	if (first_i && second_i) {
-		if (first_i->value() == second_i->value()) {
-			return new Integer { 1 };
-		} else {
-			return &Null;
-		}
+		return to_bool(first_i->value() == second_i->value());
 	}
-	std::cerr << "=: invalid argument types: " << args << "\n";
-	return nullptr;
+	ASSERT(false, "=");
 }
 
 Frame initial_frame { nullptr };
@@ -891,7 +761,7 @@ Element *Garbage_Collect_Primitive::apply(Element *args) {
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
-		if (cur != &Null && cur->get_mark() != current_mark) {
+		if (cur != &Null && cur != &True && cur->get_mark() != current_mark) {
 			++collected;
 			auto tmp { cur->next() };
 			delete cur;
@@ -946,7 +816,9 @@ static const char setup[] =
 	"(define #t 1)\n"
 	"(define #f nil)\n"
 	"(define true #t)\n"
-	"(define false #f)\n";
+	"(define false #f)\n"
+	"(define (> a b) (< b a>))\n"
+	"(define (not a) (if a false true))\n";
 
 int main(int argc, const char *argv[]) {
 	initial_frame.insert("car", new Car_Primitive());
@@ -958,9 +830,7 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("*", new Times_Primitive());
 	initial_frame.insert("/", new Divide_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
-	initial_frame.insert(">", new Greater_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
-	initial_frame.insert("not", new Not_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 
 	{
