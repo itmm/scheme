@@ -452,6 +452,14 @@ inline bool is_begin_special(Pair *lst) {
 	return is_tagged_list(lst, "begin");
 }
 
+inline bool is_and_special(Pair *lst) {
+	return is_tagged_list(lst, "and");
+}
+
+inline bool is_or_special(Pair *lst) {
+	return is_tagged_list(lst, "or");
+}
+
 Element *eval(Element *exp, Frame *env) {
 	if (! exp || exp == &Null) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
@@ -514,6 +522,32 @@ Element *eval(Element *exp, Frame *env) {
 					std::cerr << "begin: can't eval " << car(cur) << "\n";
 					break;
 				}
+			}
+			return result;
+		}
+		if (is_and_special(lst_value)) {
+			auto cur { cdr(lst_value) };
+			Element *result { new Integer { 1 } };
+			for (; cur && cur != &Null; cur = cdr(cur)) {
+				result = eval(car(cur), env);
+				if (! result) {
+					std::cerr << "and: can't eval " << car(cur) << "\n";
+					break;
+				}
+				if (result == &Null) { break; }
+			}
+			return result;
+		}
+		if (is_or_special(lst_value)) {
+			auto cur { cdr(lst_value) };
+			Element *result { &Null };
+			for (; cur && cur != &Null; cur = cdr(cur)) {
+				result = eval(car(cur), env);
+				if (! result) {
+					std::cerr << "or: can't eval " << car(cur) << "\n";
+					break;
+				}
+				if (result != &Null) { break; }
 			}
 			return result;
 		}
@@ -750,6 +784,23 @@ Element *Divide_Primitive::apply(Element *args) {
 	return new Integer { product };
 }
 
+class Not_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Not_Primitive::apply(Element *args) {
+	if (! args) {
+		std::cerr << "not: invalid args\n";
+		return nullptr;
+	}
+	if (car(args) == &Null) {
+		return new Integer { 1 };
+	} else {
+		return &Null;
+	}
+}
+
 class Less_Primitive : public Primitive {
 	public:
 		Element *apply(Element *args) override;
@@ -772,6 +823,56 @@ Element *Less_Primitive::apply(Element *args) {
 		}
 	}
 	std::cerr << "<: invalid argument types: " << args << "\n";
+	return nullptr;
+}
+
+class Greater_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Greater_Primitive::apply(Element *args) {
+	Element *first { car(args) };
+	Element *second { cadr(args) };
+	if (cdr(cdr(args)) != &Null || ! first || ! second) {
+		std::cerr << ">: argument error: " << args << "\n";
+		return nullptr;
+	}
+	auto first_i { dynamic_cast<Integer *>(first) };
+	auto second_i { dynamic_cast<Integer *>(second) };
+	if (first_i && second_i) {
+		if (first_i->value() > second_i->value()) {
+			return new Integer { 1 };
+		} else {
+			return &Null;
+		}
+	}
+	std::cerr << "<: invalid argument types: " << args << "\n";
+	return nullptr;
+}
+
+class Equal_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Equal_Primitive::apply(Element *args) {
+	Element *first { car(args) };
+	Element *second { cadr(args) };
+	if (cdr(cdr(args)) != &Null || ! first || ! second) {
+		std::cerr << "=: argument error: " << args << "\n";
+		return nullptr;
+	}
+	auto first_i { dynamic_cast<Integer *>(first) };
+	auto second_i { dynamic_cast<Integer *>(second) };
+	if (first_i && second_i) {
+		if (first_i->value() == second_i->value()) {
+			return new Integer { 1 };
+		} else {
+			return &Null;
+		}
+	}
+	std::cerr << "=: invalid argument types: " << args << "\n";
 	return nullptr;
 }
 
@@ -857,6 +958,9 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("*", new Times_Primitive());
 	initial_frame.insert("/", new Divide_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
+	initial_frame.insert(">", new Greater_Primitive());
+	initial_frame.insert("=", new Equal_Primitive());
+	initial_frame.insert("not", new Not_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 
 	{
