@@ -566,22 +566,48 @@ class Times_Primitive : public Primitive {
 
 
 Element *Times_Primitive::apply(Element *args) {
-	int product { 1 };
+	int i_product { 1 };
+	double f_product { 1.0 };
+	bool is_float { false };
 
 	Element *cur { args };
 	for (; cur && cur != &Null; cur = cdr(cur)) {
-		auto v { dynamic_cast<Integer *>(car(cur)) };
-		if (! v) {
-			std::cerr << "*: no number: " << car(cur) << "\n";
-			return nullptr;
+		if (is_float) {
+			auto vi { dynamic_cast<Integer *>(car(cur)) };
+			if (vi) {
+				f_product *= vi->value();
+				continue;
+			}
+			auto vf { dynamic_cast<Float *>(car(cur)) };
+			if (vf) {
+				is_float = true;
+				f_product *= vf->value();
+				continue;
+			}
+		} else {
+			auto vi { dynamic_cast<Integer *>(car(cur)) };
+			if (vi) {
+				i_product *= vi->value();
+				continue;
+			}
+			auto vf { dynamic_cast<Float *>(car(cur)) };
+			if (vf) {
+				is_float = true;
+				f_product = i_product * vf->value();
+				continue;
+			}
 		}
-		product *= v->value();
+		std::cerr << "*: no number: " << car(cur) << "\n";
+		return nullptr;
 	}
 	if (! cur) {
 		std::cerr << "*: wrong arguments: " << args << "\n";
 		return nullptr;
 	}
-	return new Integer { product };
+	if (is_float) {
+		return new Float { f_product };
+	}
+	return new Integer { i_product };
 }
 
 class Divide_Primitive : public Primitive {
