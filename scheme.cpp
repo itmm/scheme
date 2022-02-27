@@ -51,6 +51,7 @@ class Value_Element : public Element {
 
 using Symbol = Value_Element<std::string>;
 using Integer = Value_Element<int>;
+using Float = Value_Element<double>;
 
 class Pair : public Element {
 		Element *head_;
@@ -108,6 +109,31 @@ Element *read_list(std::istream &in) {
 	return new Pair { exp, read_list(in) };
 }
 
+bool is_float(const std::string &v) {
+	auto i = v.begin();
+	if (i == v.end()) { return false; }
+	if (*i == '+' || *i == '-') { ++i; }
+	bool digits { false };
+	bool dot { false };
+	for (; i != v.end(); ++i) {
+		if (*i >= '0' && *i <= '9') {
+			digits = true;
+		} else if (*i == '.') {
+			if (dot) { return false; }
+			if (! digits) { return false; }
+			digits = false;
+			dot = true;
+		} else { 
+			return false;
+		}
+	}
+	return dot && digits;
+}
+
+double float_value(const std::string &v) {
+	return std::stod(v);
+}
+
 Element *read_expression(std::istream &in) {
 	eat_space(in);
 	if (ch == EOF) { return nullptr; }
@@ -125,9 +151,11 @@ Element *read_expression(std::istream &in) {
 		ch = in.get();
 		if (ch == EOF || ch <= ' ' || ch == '(' || ch == ')') { break; }
 	}
-	return numeric ?
-		static_cast<Element *>(new Integer { value }) :
-		static_cast<Element *>(new Symbol { result.str() });
+	if (numeric) { return new Integer { value }; }
+	if (is_float(result.str())) {
+		return new Float { float_value(result.str()) };
+	}
+	return new Symbol { result.str() };
 }
 
 #include <map>
@@ -359,6 +387,8 @@ Element *eval(Element *exp, Frame *env) {
 	if (! exp || exp == &Null) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
 	if (int_value) { return int_value; }
+	auto float_value { dynamic_cast<Float *>(exp) };
+	if (float_value) { return float_value; }
 	auto sym_value { dynamic_cast<Symbol *>(exp) };
 	if (sym_value) {
 		Element *got { env->get(sym_value->value()) };
@@ -453,22 +483,47 @@ class Plus_Primitive : public Primitive {
 
 
 Element *Plus_Primitive::apply(Element *args) {
-	int sum { 0 };
+	int i_sum { 0 };
+	double f_sum { 0.0 };
+	bool is_float { false };
 
 	Element *cur { args };
 	for (; cur && cur != &Null; cur = cdr(cur)) {
-		auto v { dynamic_cast<Integer *>(car(cur)) };
-		if (! v) {
-			std::cerr << "+: no number: " << car(cur) << "\n";
-			return nullptr;
+		if (is_float) {
+			auto vi { dynamic_cast<Integer *>(car(cur)) };
+			if (vi) {
+				f_sum += vi->value();
+				continue;
+			}
+			auto vf { dynamic_cast<Float *>(car(cur)) };
+			if (vf) {
+				f_sum += vf->value();
+				continue;
+			}
+		} else {
+			auto vi { dynamic_cast<Integer *>(car(cur)) };
+			if (vi) {
+				i_sum += vi->value();
+				continue;
+			}
+			auto vf { dynamic_cast<Float *>(car(cur)) };
+			if (vf) {
+				is_float = true;
+				f_sum = i_sum + vf->value();
+				continue;
+			}
 		}
-		sum += v->value();
+		std::cerr << "+: no number: " << car(cur) << "\n";
+		return nullptr;
 	}
 	if (! cur) {
 		std::cerr << "+: wrong arguments: " << args << "\n";
 		return nullptr;
 	}
-	return new Integer { sum };
+	if (is_float) {
+		return new Float { f_sum };
+	}
+	return new Integer { i_sum };
 }
 
 class Minus_Primitive : public Primitive {
