@@ -330,12 +330,16 @@ Pair *eval_list(Pair *exp, Frame *env) {
 	}
 }
 
-inline bool is_define_special(Pair *lst) {
+bool is_tagged_list(Pair *lst, const std::string &tag) {
 	auto sym { dynamic_cast<Symbol *>(car(lst)) };
-	return sym != nullptr && sym->value() == "define";
+	return sym != nullptr && sym->value() == tag;
 }
 
-Element *cadr(Pair *lst) {
+inline bool is_define_special(Pair *lst) {
+	return is_tagged_list(lst, "define");
+}
+
+Element *cadr(Element *lst) {
 	return car(cdr(lst));
 }
 
@@ -355,8 +359,12 @@ inline Symbol *define_key(Pair *lst) {
 	return nullptr;
 }
 
-Element *caddr(Pair *lst) {
+Element *caddr(Element *lst) {
 	return car(cdr(cdr(lst)));
+}
+
+Element *cadddr(Element *lst) {
+	return car(cdr(cdr(cdr(lst))));
 }
 
 inline Element *define_value(Pair *lst, Frame *env) {
@@ -371,8 +379,7 @@ inline Element *define_value(Pair *lst, Frame *env) {
 }
 
 inline bool is_lambda_special(Pair *lst) {
-	auto sym { dynamic_cast<Symbol *>(car(lst)) };
-	return sym != nullptr && sym->value() == "lambda";
+	return is_tagged_list(lst, "lambda");
 }
 
 inline Element *lambda_args(Pair *lst) {
@@ -381,6 +388,68 @@ inline Element *lambda_args(Pair *lst) {
 
 inline Element *lambda_body(Pair *lst) {
 	return cdr(cdr(lst));
+}
+
+inline bool is_if_special(Pair *lst) {
+	return is_tagged_list(lst, "if");
+}
+
+inline Element *if_condition(Pair *lst) {
+	return cadr(lst);
+}
+
+inline Element *if_consequence(Pair *lst) {
+	return caddr(lst);
+}
+
+inline Element *if_alternative(Pair *lst) {
+	return cadddr(lst);
+}
+
+inline bool is_cond_special(Pair *lst) {
+	return is_tagged_list(lst, "cond");
+}
+
+Element *build_cond(Element *lst) {
+	if (! lst || lst == &Null) { return lst; }
+	auto expr { car(lst) };
+	auto cond { car(expr) };
+	auto cons { cdr(expr) };
+	if (! cond || ! cons) {
+		std::cerr << "cond: invalid pair " << lst << "\n";
+		return nullptr;
+	}
+	auto sym { dynamic_cast<Symbol *>(cond) };
+	if (sym && sym->value() == "else") {
+		if (cdr(lst) != &Null) {
+			std::cerr << "cond: else not in last case\n";
+			return nullptr;
+		}
+		return new Pair {
+			new Symbol { "begin" },
+			cons
+		};
+	}
+	return new Pair {
+		new Symbol { "if" },
+		new Pair {
+			cond,
+			new Pair {
+				new Pair {
+					new Symbol { "begin" },
+					cons
+				},
+				new Pair {
+					build_cond(cdr(lst)),
+					&Null
+				}
+			}
+		}
+	};
+}
+
+inline bool is_begin_special(Pair *lst) {
+	return is_tagged_list(lst, "begin");
 }
 
 Element *eval(Element *exp, Frame *env) {
@@ -414,6 +483,39 @@ Element *eval(Element *exp, Frame *env) {
 				return nullptr;
 			}
 			return new Procedure(args, body, env);
+		}
+		if (is_if_special(lst_value)) {
+			auto condition { eval(if_condition(lst_value), env) };
+			if (! condition) {
+				std::cerr << "if: invalid condition " << lst_value << "\n";
+				return nullptr;
+			}
+			if (condition != &Null) {
+				return eval(if_consequence(lst_value), env);
+			} else {
+				return eval(if_alternative(lst_value), env);
+			}
+		}
+		if (is_cond_special(lst_value)) {
+			auto expr { build_cond(cdr(lst_value)) };
+			if (! expr) {
+				std::cerr << "cond: invalid expression " << lst_value << "\n";
+				return nullptr;
+			}
+			std::cerr << expr << "\n";
+			return eval(expr, env);
+		}
+		if (is_begin_special(lst_value)) {
+			Element *result;
+			auto cur { cdr(lst_value) };
+			for (; cur && cur != &Null; cur = cdr(cur)) {
+				result = eval(car(cur), env);
+				if (! result) {
+					std::cerr << "begin: can't eval " << car(cur) << "\n";
+					break;
+				}
+			}
+			return result;
 		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(lst->head(), lst->rest());
@@ -648,6 +750,31 @@ Element *Divide_Primitive::apply(Element *args) {
 	return new Integer { product };
 }
 
+class Less_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+};
+
+Element *Less_Primitive::apply(Element *args) {
+	Element *first { car(args) };
+	Element *second { cadr(args) };
+	if (cdr(cdr(args)) != &Null || ! first || ! second) {
+		std::cerr << "<: argument error: " << args << "\n";
+		return nullptr;
+	}
+	auto first_i { dynamic_cast<Integer *>(first) };
+	auto second_i { dynamic_cast<Integer *>(second) };
+	if (first_i && second_i) {
+		if (first_i->value() < second_i->value()) {
+			return new Integer { 1 };
+		} else {
+			return &Null;
+		}
+	}
+	std::cerr << "<: invalid argument types: " << args << "\n";
+	return nullptr;
+}
+
 Frame initial_frame { nullptr };
 
 class Garbage_Collect_Primitive : public Primitive {
@@ -714,7 +841,11 @@ static const char setup[] =
 	"(define (cadr l) (car (cdr l)))\n"
 	"(define (cddr l) (cdr (cdr l)))\n"
 	"(define (caddr l) (car (cddr l)))\n"
-	"(define (cdddr l) (cdr (cddr l)))\n";
+	"(define (cdddr l) (cdr (cddr l)))\n"
+	"(define #t 1)\n"
+	"(define #f nil)\n"
+	"(define true #t)\n"
+	"(define false #f)\n";
 
 int main(int argc, const char *argv[]) {
 	initial_frame.insert("car", new Car_Primitive());
@@ -725,6 +856,7 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("-", new Minus_Primitive());
 	initial_frame.insert("*", new Times_Primitive());
 	initial_frame.insert("/", new Divide_Primitive());
+	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 
 	{
