@@ -97,6 +97,15 @@ void eat_space(std::istream &in) {
 	while (ch != EOF && ch <= ' ') { ch = in.get(); }
 }
 
+Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
+	std::cerr << fn << ": " << msg;
+	if (exp) { std::cerr << " (" << exp << ')'; }
+	std::cerr << '\n';
+	return nullptr;
+}
+
+#define ASSERT(CND, FN) if (! (CND)) { err((FN), "no " #CND); return nullptr; }
+
 Element *read_list(std::istream &in) {
 	eat_space(in);
 	if (ch == EOF) {
@@ -108,6 +117,16 @@ Element *read_list(std::istream &in) {
 		return &Null;
 	}
 	auto exp { read_expression(in) };
+	eat_space(in);
+	if (ch == '.') {
+		ch = in.get();
+		auto result { new Pair { exp, read_expression(in) } };
+		eat_space(in);
+		ASSERT(ch == ')', "read_list");
+		ch = in.get();
+		return result;
+
+	}
 	return new Pair { exp, read_list(in) };
 }
 
@@ -140,6 +159,13 @@ Element *read_expression(std::istream &in) {
 	eat_space(in);
 	if (ch == EOF) { return nullptr; }
 	if (ch == '(') { ch = in.get(); return read_list(in); }
+	if (ch == '\'') {
+		ch = in.get();
+		return new Pair {
+			new Symbol { "quote" },
+			read_expression(in)
+		};
+	}
 	std::ostringstream result;
 	bool numeric { true };
 	int value { 0 };
@@ -222,15 +248,6 @@ class Procedure : public Element {
 };
 
 Element *eval(Element *exp, Frame *env);
-
-Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
-	std::cerr << fn << ": " << msg;
-	if (exp) { std::cerr << " (" << exp << ')'; }
-	std::cerr << '\n';
-	return nullptr;
-}
-
-#define ASSERT(CND, FN) if (! (CND)) { err((FN), "no " #CND); return nullptr; }
 
 Element *car(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
@@ -436,6 +453,10 @@ inline bool is_or_special(Pair *lst) {
 	return is_tagged_list(lst, "or");
 }
 
+inline bool is_quote_special(Pair *lst) {
+	return is_tagged_list(lst, "quote");
+}
+
 bool is_true(Element *value) {
 	if (! value) { err("is_true", "no value"); }
 	return value && value != &Null;
@@ -521,6 +542,9 @@ Element *eval(Element *exp, Frame *env) {
 			}
 			return result;
 		}
+		if (is_quote_special(lst_value)) {
+			return cdr(lst_value);
+		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(lst->head(), lst->rest());
 	}
@@ -570,51 +594,64 @@ Element *Cons_Primitive::apply(Element *args) {
 	return new Pair { first, second };
 }
 
-class Plus_Primitive : public Primitive {
+class Null_Primitive: public Primitive {
 	public:
-		Element *apply(Element *args) override;
+		Element *apply(Element *args) override {
+			Element *obj { car(args) };
+			ASSERT(obj, "null?");
+			return to_bool(is_null(obj));
+		}
 };
 
-
-Element *Plus_Primitive::apply(Element *args) {
-	int i_sum { 0 };
-	double f_sum { 0.0 };
-	bool is_float { false };
-
-	Element *cur { args };
-	for (; ! is_null(cur); cur = cdr(cur)) {
-		if (is_float) {
-			auto vi { dynamic_cast<Integer *>(car(cur)) };
-			if (vi) {
-				f_sum += vi->value();
-				continue;
-			}
-			auto vf { dynamic_cast<Float *>(car(cur)) };
-			if (vf) {
-				f_sum += vf->value();
-				continue;
-			}
-		} else {
-			auto vi { dynamic_cast<Integer *>(car(cur)) };
-			if (vi) {
-				i_sum += vi->value();
-				continue;
-			}
-			auto vf { dynamic_cast<Float *>(car(cur)) };
-			if (vf) {
-				is_float = true;
-				f_sum = i_sum + vf->value();
-				continue;
-			}
+class Apply_Primitive: public Primitive {
+	public:
+		Element *apply(Element *args) override {
+			Element *fn { car(args) };
+			Element *fn_args { cadr(args) };
+			ASSERT(fn && fn_args && is_null(cddr(args)), "apply");
+			return ::apply(fn, fn_args);
 		}
-		ASSERT(false, "+");
+};
+
+class Numeric_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override;
+	
+	protected:
+		virtual Element *do_int(int a, int b) = 0;
+		virtual Element *do_real(double a, double b) = 0;
+};
+
+Element *Numeric_Primitive::apply(Element *args) {
+	Element *a { car(args) };
+	Element *b { cadr(args) };
+	ASSERT(a && b && is_null(cddr(args)), "numeric");
+	auto a_i { dynamic_cast<Integer *>(a) };
+	auto b_i { dynamic_cast<Integer *>(b) };
+	if (a_i && b_i) {
+		return do_int(a_i->value(), b_i->value());
 	}
-	ASSERT(cur, "+");
-	if (is_float) {
-		return new Float { f_sum };
+	Float *a_f { nullptr }; Float *b_f { nullptr };
+	if (! a_i) { a_f = dynamic_cast<Float *>(a); }
+	if (! b_i) { b_f = dynamic_cast<Float *>(b); }
+	if ((a_i || a_f) && (b_i || b_f)) {
+		return do_real(
+			a_f ? a_f->value() : static_cast<double>(a_i->value()),
+			b_f ? b_f->value() : static_cast<double>(b_i->value())
+		);
 	}
-	return new Integer { i_sum };
+	ASSERT(false, "numeric");
 }
+
+class Add_Primitive : public Numeric_Primitive {
+	protected:
+		Element *do_int(int a, int b) override {
+			return new Integer { a + b };
+		}
+		Element *do_real(double a, double b) override {
+			return new Float { a + b };
+		}
+};
 
 class Minus_Primitive : public Primitive {
 	public:
@@ -818,19 +855,25 @@ static const char setup[] =
 	"(define true #t)\n"
 	"(define false #f)\n"
 	"(define (> a b) (< b a>))\n"
-	"(define (not a) (if a false true))\n";
+	"(define (not a) (if a false true))\n"
+	"(define (+ . args)\n"
+	"  (if (null? args)\n"
+	"      0\n"
+	"      (#binary+ (car args) (apply + (cdr args)))))\n";
 
 int main(int argc, const char *argv[]) {
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("list", new List_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
-	initial_frame.insert("+", new Plus_Primitive());
+	initial_frame.insert("#binary+", new Add_Primitive());
 	initial_frame.insert("-", new Minus_Primitive());
 	initial_frame.insert("*", new Times_Primitive());
 	initial_frame.insert("/", new Divide_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
+	initial_frame.insert("null?", new Null_Primitive());
+	initial_frame.insert("apply", new Apply_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 
 	{
