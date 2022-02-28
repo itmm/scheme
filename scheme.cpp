@@ -325,7 +325,7 @@ Element *apply(Element *op, Element *operands) {
 	if (prim) { return prim->apply(operands); }
 	auto proc { dynamic_cast<Procedure *>(op) };
 	if (proc) { return proc->apply(operands); }
-	ASSERT(false, "apply");
+	return err("apply", "unknown operation", op);
 }
 
 Pair *eval_list(Pair *exp, Frame *env) {
@@ -690,6 +690,17 @@ class Div_Primitive : public Numeric_Primitive {
 		}
 };
 
+class Remainder_Primitive : public Numeric_Primitive {
+	protected:
+		Element *do_int(int a, int b) override {
+			ASSERT(b != 0, "remainder");
+			return new Integer { a % b };
+		}
+		Element *do_real(double a, double b) override {
+			ASSERT(false, "remainder");
+		}
+};
+
 class Less_Primitive : public Numeric_Primitive {
 	protected:
 		Element *do_int(int a, int b) override {
@@ -780,6 +791,7 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("#binary-", new Sub_Primitive());
 	initial_frame.insert("#binary*", new Mul_Primitive());
 	initial_frame.insert("#binary/", new Div_Primitive());
+	initial_frame.insert("remainder", new Remainder_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
 	initial_frame.insert("null?", new Null_Primitive());
