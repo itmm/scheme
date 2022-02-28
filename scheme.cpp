@@ -653,135 +653,56 @@ class Add_Primitive : public Numeric_Primitive {
 		}
 };
 
-class Minus_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-};
-
-Element *Minus_Primitive::apply(Element *args) {
-	int sum { 0 };
-	
-	Element *cur { args };
-	if (cur == &Null) { return new Integer(sum); }
-	auto first { dynamic_cast<Integer *>(car(cur)) };
-	ASSERT(first, "-");
-	cur = cdr(cur);
-	if (cur == &Null) { return new Integer(-first->value()); }
-	sum = first->value();
-	for (; ! is_null(cur); cur = cdr(cur)) {
-		auto vv { dynamic_cast<Integer *>(car(cur)) };
-		ASSERT(vv, "-");
-		sum -= vv->value();
-	}
-	ASSERT(cur, "-");
-	return new Integer { sum };
-}
-
-class Times_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-};
-
-
-Element *Times_Primitive::apply(Element *args) {
-	int i_product { 1 };
-	double f_product { 1.0 };
-	bool is_float { false };
-
-	Element *cur { args };
-	for (; ! is_null(cur); cur = cdr(cur)) {
-		if (is_float) {
-			auto vi { dynamic_cast<Integer *>(car(cur)) };
-			if (vi) {
-				f_product *= vi->value();
-				continue;
-			}
-			auto vf { dynamic_cast<Float *>(car(cur)) };
-			if (vf) {
-				is_float = true;
-				f_product *= vf->value();
-				continue;
-			}
-		} else {
-			auto vi { dynamic_cast<Integer *>(car(cur)) };
-			if (vi) {
-				i_product *= vi->value();
-				continue;
-			}
-			auto vf { dynamic_cast<Float *>(car(cur)) };
-			if (vf) {
-				is_float = true;
-				f_product = i_product * vf->value();
-				continue;
-			}
+class Sub_Primitive : public Numeric_Primitive {
+	protected:
+		Element *do_int(int a, int b) override {
+			return new Integer { a - b };
 		}
-		ASSERT(false, "*");
-	}
-	ASSERT(cur, "*");
-	if (is_float) {
-		return new Float { f_product };
-	}
-	return new Integer { i_product };
-}
-
-class Divide_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
+		Element *do_real(double a, double b) override {
+			return new Float { a - b };
+		}
 };
 
-Element *Divide_Primitive::apply(Element *args) {
-	int product { 1 };
-	
-	Element *cur { args };
-	auto first { dynamic_cast<Integer *>(car(cur)) };
-	ASSERT(first, "/");
-	product = first->value();
-	cur = cdr(cur);
-	if (cur == &Null) { 
-		ASSERT(product != 0, "/");
-		return new Integer(1/product);
-	}
-	for (; cur && cur != &Null; cur = cdr(cur)) {
-		auto vv { dynamic_cast<Integer *>(car(cur)) };
-		ASSERT(vv, "/");
-		ASSERT(vv->value(), "/");
-		product /= vv->value();
-	}
-	ASSERT(cur, "/");
-	return new Integer { product };
-}
-
-class Less_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
+class Mul_Primitive : public Numeric_Primitive {
+	protected:
+		Element *do_int(int a, int b) override {
+			return new Integer { a * b };
+		}
+		Element *do_real(double a, double b) override {
+			return new Float { a * b };
+		}
 };
 
-Element *Less_Primitive::apply(Element *args) {
-	Element *first { car(args) };
-	Element *second { cadr(args) };
-	ASSERT(first && second && is_null(cddr(args)), "<");
-	auto first_i { dynamic_cast<Integer *>(first) };
-	auto second_i { dynamic_cast<Integer *>(second) };
-	ASSERT(first_i && second_i, "<");
-	return to_bool(first_i->value() < second_i->value());
-}
-
-class Equal_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
+class Div_Primitive : public Numeric_Primitive {
+	protected:
+		Element *do_int(int a, int b) override {
+			ASSERT(b != 0, "div");
+			return new Integer { a / b };
+		}
+		Element *do_real(double a, double b) override {
+			return new Float { a / b };
+		}
 };
 
-Element *Equal_Primitive::apply(Element *args) {
-	Element *first { car(args) };
-	Element *second { cadr(args) };
-	ASSERT(first && second && is_null(cddr(args)), "=");
-	auto first_i { dynamic_cast<Integer *>(first) };
-	auto second_i { dynamic_cast<Integer *>(second) };
-	if (first_i && second_i) {
-		return to_bool(first_i->value() == second_i->value());
-	}
-	ASSERT(false, "=");
-}
+class Less_Primitive : public Numeric_Primitive {
+	protected:
+		Element *do_int(int a, int b) override {
+			return to_bool(a < b);
+		}
+		Element *do_real(double a, double b) override {
+			return to_bool(a < b);
+		}
+};
+
+class Equal_Primitive : public Numeric_Primitive {
+	protected:
+		Element *do_int(int a, int b) override {
+			return to_bool(a == b);
+		}
+		Element *do_real(double a, double b) override {
+			return to_bool(a == b);
+		}
+};
 
 Frame initial_frame { nullptr };
 
@@ -844,32 +765,15 @@ void process_stream(std::istream &in, std::ostream *out, bool prompt) {
 
 #include <fstream>
 
-static const char setup[] =
-	"(define nil ())\n"
-	"(define (cadr l) (car (cdr l)))\n"
-	"(define (cddr l) (cdr (cdr l)))\n"
-	"(define (caddr l) (car (cddr l)))\n"
-	"(define (cdddr l) (cdr (cddr l)))\n"
-	"(define #t 1)\n"
-	"(define #f nil)\n"
-	"(define true #t)\n"
-	"(define false #f)\n"
-	"(define (> a b) (< b a>))\n"
-	"(define (not a) (if a false true))\n"
-	"(define (+ . args)\n"
-	"  (if (null? args)\n"
-	"      0\n"
-	"      (#binary+ (car args) (apply + (cdr args)))))\n";
-
 int main(int argc, const char *argv[]) {
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("list", new List_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("#binary+", new Add_Primitive());
-	initial_frame.insert("-", new Minus_Primitive());
-	initial_frame.insert("*", new Times_Primitive());
-	initial_frame.insert("/", new Divide_Primitive());
+	initial_frame.insert("#binary-", new Sub_Primitive());
+	initial_frame.insert("#binary*", new Mul_Primitive());
+	initial_frame.insert("#binary/", new Div_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
 	initial_frame.insert("null?", new Null_Primitive());
@@ -877,7 +781,7 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 
 	{
-		std::istringstream s { setup };
+		std::ifstream s { "scheme.scm" };
 		process_stream(s, nullptr, false);
 	}
 
