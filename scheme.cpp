@@ -73,6 +73,12 @@ Pair Null { &Null, &Null };
 Integer True { 1 };
 
 std::ostream &Pair::write(std::ostream &out) const {
+	auto sym { dynamic_cast<Symbol *>(head_) };
+	if (sym && sym->value() == "quote") {
+		out << "'";
+		return rest_->write(out);
+	}
+
 	out << '(';
 	bool first { true };
 	const Pair *cur { this };
