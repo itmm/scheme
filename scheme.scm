@@ -16,6 +16,7 @@
   (lambda args (accumulate init op args)))
 (define + (#mk-simple-numeric #binary+ 0))
 (define * (#mk-simple-numeric #binary* 1))
+(define (remainder a b) (- a (* (/ a b) b)))
 (define (#mk-special-numeric op init)
   (lambda args
     (cond ((null? args) init)

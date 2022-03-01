@@ -64,11 +64,11 @@ Element *err(const std::string fn, const std::string msg, Element *exp = nullptr
 #include <vector>
 
 class Integer : public Element {
-		int value_;
+		unsigned value_;
 	public:
-		Integer(int value): value_ { value } { }
-		int int_value() const { return value_; }
-		double float_value() const { return static_cast<float>(value_); }
+		Integer(unsigned value): value_ { value } { }
+		unsigned int_value() const { return value_; }
+		double float_value() const { return static_cast<double>(value_); }
 		std::ostream &write(std::ostream &out) const override {
 			return out << value_;
 		}
@@ -77,41 +77,78 @@ class Integer : public Element {
 
 class Negative_Integer : public Integer {
 	public:
-		Negative_Integer(int value): Integer { value } { }
+		Negative_Integer(unsigned value): Integer { value } { }
 		virtual bool negative() const { return true; }
 		std::ostream &write(std::ostream &out) const override {
 			return Integer::write(out << "(- ") << ')';
 		}
 };
 
+Integer *operator-(const Integer &a);
+Integer *operator-(const Integer &a, const Integer &b);
+
 Integer *operator+(const Integer &a, const Integer &b) {
-	return new Integer(a.int_value() + b.int_value());
+	auto a_neg { a.negative() };
+	auto b_neg { b.negative() };
+	if (! a_neg && b_neg) {
+		return a - *(-b);
+	} else if (a_neg && b_neg) {
+		return -*(*(-a) + *(-b));
+	} else if (a_neg && ! b_neg) {
+		return -*(*(-a) - b);
+	}
+	return new Integer { a.int_value() + b.int_value() };
 }
 
 Integer *operator-(const Integer &a) {
 	if (a.negative()) {
-		return new Integer(a.int_value());
+		return new Integer { a.int_value() };
 	} else {
 		return new Negative_Integer(a.int_value());
 	}
 }
 
 Integer *operator-(const Integer &a, const Integer &b) {
-	return new Integer(a.int_value() - b.int_value());
+	auto a_neg { a.negative() };
+	auto b_neg { b.negative() };
+	if (! a_neg && b_neg) {
+		return a + *(-b);
+	} else if (a_neg && b_neg) {
+		return -*(*(-a) - *(-b));
+	} else if (a_neg && ! b_neg) {
+		return -*(*(-a) + b);
+	}
+	if (a.int_value() < b.int_value()) {
+		return new Negative_Integer { b.int_value() - a.int_value() };
+	}
+	return new Integer { a.int_value() - b.int_value() };
 }
 
 Integer *operator*(const Integer &a, const Integer &b) {
+	auto a_neg { a.negative() };
+	auto b_neg { b.negative() };
+	if (a_neg && b_neg) {
+		return *(-a) * *(-b);
+	} else if (a_neg && ! b_neg) {
+		return -*(*(-a) * b);
+	} else if (! a_neg && b_neg) {
+		return -*(a * *(-b));
+	}
 	return new Integer(a.int_value() * b.int_value());
 }
 
 Integer *operator/(const Integer &a, const Integer &b) {
+	auto a_neg { a.negative() };
+	auto b_neg { b.negative() };
+	if (a_neg && b_neg) {
+		return *(-a) / *(-b);
+	} else if (a_neg && ! b_neg) {
+		return -*(*(-a) / b);
+	} else if (! a_neg && b_neg) {
+		return -*(a / *(-b));
+	}
 	ASSERT(b.int_value(), "int/");
 	return new Integer(a.int_value() / b.int_value());
-}
-
-Integer *operator%(const Integer &a, const Integer &b) {
-	ASSERT(b.int_value(), "int%");
-	return new Integer(a.int_value() % b.int_value());
 }
 
 class Pair : public Element {
@@ -140,11 +177,20 @@ Element *to_bool(bool cond) {
 }
 
 Element *operator<(const Integer &a, const Integer &b) {
+	auto a_neg { a.negative() };
+	auto b_neg { a.negative() };
+	if (a_neg && b_neg) {
+		return to_bool(b.int_value() < a.int_value());
+	} else if (a_neg && ! b_neg) {
+		return to_bool(a.int_value() || b.int_value());
+	} else if (! a_neg && b_neg) {
+		return to_bool(false);
+	}
 	return to_bool(a.int_value() < b.int_value());
 }
 
 Element *operator==(const Integer &a, const Integer &b) {
-	return to_bool(a.int_value() == b.int_value());
+	return to_bool(a.negative() == b.negative() && a.int_value() == b.int_value());
 }
 
 std::ostream &Pair::write(std::ostream &out) const {
@@ -240,7 +286,7 @@ Element *read_expression(std::istream &in) {
 	}
 	std::ostringstream result;
 	bool numeric { true };
-	int value { 0 };
+	unsigned value { 0 };
 	for (;;) {
 		if (ch >= '0' && ch <= '9') {
 			value = value * 10 + (ch - '0');
@@ -747,16 +793,6 @@ class Div_Primitive : public Numeric_Primitive {
 		}
 };
 
-class Remainder_Primitive : public Numeric_Primitive {
-	protected:
-		Element *do_int(const Integer &a, const Integer &b) override {
-			return a % b;
-		}
-		Element *do_float(double a, double b) override {
-			ASSERT(false, "remainder");
-		}
-};
-
 class Less_Primitive : public Numeric_Primitive {
 	protected:
 		Element *do_int(const Integer &a, const Integer &b) override {
@@ -787,8 +823,8 @@ class Garbage_Collect_Primitive : public Primitive {
 Element *Garbage_Collect_Primitive::apply(Element *args) {
 	current_mark = ! current_mark;
 	initial_frame.mark();
-	int kept { 0 };
-	int collected { 0 };
+	unsigned kept { 0 };
+	unsigned collected { 0 };
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
@@ -847,7 +883,6 @@ int main(int argc, const char *argv[]) {
 	initial_frame.insert("#binary-", new Sub_Primitive());
 	initial_frame.insert("#binary*", new Mul_Primitive());
 	initial_frame.insert("#binary/", new Div_Primitive());
-	initial_frame.insert("remainder", new Remainder_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
 	initial_frame.insert("null?", new Null_Primitive());
