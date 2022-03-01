@@ -64,13 +64,40 @@ Element *err(const std::string fn, const std::string msg, Element *exp = nullptr
 #include <vector>
 
 class Integer : public Element {
-		unsigned value_;
 	public:
-		Integer(unsigned value): value_ { value } { }
+		using Digits = std::vector<char>;
+	private:
+		unsigned value_;
+		Digits digits_;
+		void push_digits(unsigned value) {
+			if (value) {
+				digits_.push_back('0' + (value % 10));
+				push_digits(value / 10);
+			}
+		}
+		void normalize() {
+			while (! digits_.empty() && digits_.back() == '0') {
+				digits_.pop_back();
+			}
+		}
+	public:
+		Integer(unsigned value): value_ { value } {
+			push_digits(value);
+		}
+		Integer(const Digits &digits): digits_ { digits } {
+			normalize();
+		}
+		Integer(Digits &&digits): digits_ { std::move(digits) } {
+			normalize();
+		}
 		unsigned int_value() const { return value_; }
+		const Digits &digits() const { return digits_; }
 		double float_value() const { return static_cast<double>(value_); }
 		std::ostream &write(std::ostream &out) const override {
-			return out << value_;
+			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
+				out << *i;
+			}
+			return out;
 		}
 		virtual bool negative() const { return false; }
 };
@@ -78,6 +105,8 @@ class Integer : public Element {
 class Negative_Integer : public Integer {
 	public:
 		Negative_Integer(unsigned value): Integer { value } { }
+		Negative_Integer(const Digits &digits): Integer { digits } { }
+		Negative_Integer(Digits &&digits): Integer { std::move(digits) } { }
 		virtual bool negative() const { return true; }
 		std::ostream &write(std::ostream &out) const override {
 			return Integer::write(out << "(- ") << ')';
@@ -97,14 +126,28 @@ Integer *operator+(const Integer &a, const Integer &b) {
 	} else if (a_neg && ! b_neg) {
 		return -*(*(-a) - b);
 	}
-	return new Integer { a.int_value() + b.int_value() };
+
+	Integer::Digits digits;
+	auto a_i { a.digits().begin() };
+	auto b_i { b.digits().begin() };
+	int carry { 0 };
+	for (;;) {
+		if (a_i == a.digits().end() && b_i == b.digits().end() && ! carry) { break; }
+		int v { carry };
+		if (a_i != a.digits().end()) { v += *a_i++ - '0'; }
+		if (b_i != b.digits().end()) { v += *b_i++ - '0'; }
+		if (v >= 10) { v -= 10; carry = 1; } else { carry = 0; }
+		digits.push_back(v + '0');
+	}
+
+	return new Integer { std::move(digits) };
 }
 
 Integer *operator-(const Integer &a) {
 	if (a.negative()) {
-		return new Integer { a.int_value() };
+		return new Integer { a.digits() };
 	} else {
-		return new Negative_Integer(a.int_value());
+		return new Negative_Integer(a.digits());
 	}
 }
 
@@ -121,7 +164,20 @@ Integer *operator-(const Integer &a, const Integer &b) {
 	if (a.int_value() < b.int_value()) {
 		return new Negative_Integer { b.int_value() - a.int_value() };
 	}
-	return new Integer { a.int_value() - b.int_value() };
+
+	Integer::Digits digits;
+	auto a_i { a.digits().begin() };
+	auto b_i { b.digits().begin() };
+	int carry { 0 };
+	for (;;) {
+		if (a_i == a.digits().end()) { break; }
+		int v = { *a_i++ - '0' + carry };
+		if (b_i != b.digits().end()) { v -= *b_i++ - '0'; }
+		if (v < 0) { v += 10; carry = -1; } else { carry = 0; }
+		digits.push_back(v + '0');
+	}
+
+	return new Integer { std::move(digits) };
 }
 
 Integer *operator*(const Integer &a, const Integer &b) {
