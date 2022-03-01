@@ -50,8 +50,69 @@ class Value_Element : public Element {
 };
 
 using Symbol = Value_Element<std::string>;
-using Integer = Value_Element<int>;
 using Float = Value_Element<double>;
+
+Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
+	std::cerr << fn << ": " << msg;
+	if (exp) { std::cerr << " (" << exp << ')'; }
+	std::cerr << '\n';
+	return nullptr;
+}
+
+#define ASSERT(CND, FN) if (! (CND)) { err((FN), "no " #CND); return nullptr; }
+
+#include <vector>
+
+class Integer : public Element {
+		int value_;
+	public:
+		Integer(int value): value_ { value } { }
+		int int_value() const { return value_; }
+		double float_value() const { return static_cast<float>(value_); }
+		std::ostream &write(std::ostream &out) const override {
+			return out << value_;
+		}
+		virtual bool negative() const { return false; }
+};
+
+class Negative_Integer : public Integer {
+	public:
+		Negative_Integer(int value): Integer { value } { }
+		virtual bool negative() const { return true; }
+		std::ostream &write(std::ostream &out) const override {
+			return Integer::write(out << "(- ") << ')';
+		}
+};
+
+Integer *operator+(const Integer &a, const Integer &b) {
+	return new Integer(a.int_value() + b.int_value());
+}
+
+Integer *operator-(const Integer &a) {
+	if (a.negative()) {
+		return new Integer(a.int_value());
+	} else {
+		return new Negative_Integer(a.int_value());
+	}
+}
+
+Integer *operator-(const Integer &a, const Integer &b) {
+	return new Integer(a.int_value() - b.int_value());
+}
+
+Integer *operator*(const Integer &a, const Integer &b) {
+	return new Integer(a.int_value() * b.int_value());
+}
+
+Integer *operator/(const Integer &a, const Integer &b) {
+	ASSERT(b.int_value(), "int/");
+	return new Integer(a.int_value() / b.int_value());
+}
+
+Integer *operator%(const Integer &a, const Integer &b) {
+	ASSERT(b.int_value(), "int%");
+	return new Integer(a.int_value() % b.int_value());
+}
 
 class Pair : public Element {
 		Element *head_;
@@ -71,6 +132,20 @@ class Pair : public Element {
 Pair Null { &Null, &Null };
 #define False Null
 Integer True { 1 };
+
+Element *to_bool(bool cond) {
+	return cond ?
+		dynamic_cast<Element *>(&True) :
+		dynamic_cast<Element *>(&False);
+}
+
+Element *operator<(const Integer &a, const Integer &b) {
+	return to_bool(a.int_value() < b.int_value());
+}
+
+Element *operator==(const Integer &a, const Integer &b) {
+	return to_bool(a.int_value() == b.int_value());
+}
 
 std::ostream &Pair::write(std::ostream &out) const {
 	auto sym { dynamic_cast<Symbol *>(head_) };
@@ -102,15 +177,6 @@ Element *read_expression(std::istream &in);
 void eat_space(std::istream &in) {
 	while (ch != EOF && ch <= ' ') { ch = in.get(); }
 }
-
-Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
-	std::cerr << fn << ": " << msg;
-	if (exp) { std::cerr << " (" << exp << ')'; }
-	std::cerr << '\n';
-	return nullptr;
-}
-
-#define ASSERT(CND, FN) if (! (CND)) { err((FN), "no " #CND); return nullptr; }
 
 Element *read_list(std::istream &in) {
 	eat_space(in);
@@ -473,12 +539,6 @@ bool is_false(Element *value) {
 	return value == &Null;
 }
 
-Element *to_bool(bool cond) {
-	return cond ?
-		dynamic_cast<Element *>(&True) :
-		dynamic_cast<Element *>(&False);
-}
-
 Element *eval(Element *exp, Frame *env) {
 	if (! exp || exp == &Null) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
@@ -624,8 +684,8 @@ class Numeric_Primitive : public Primitive {
 		Element *apply(Element *args) override;
 	
 	protected:
-		virtual Element *do_int(int a, int b) = 0;
-		virtual Element *do_real(double a, double b) = 0;
+		virtual Element *do_int(const Integer &a, const Integer &b) = 0;
+		virtual Element *do_float(double a, double b) = 0;
 };
 
 Element *Numeric_Primitive::apply(Element *args) {
@@ -634,16 +694,14 @@ Element *Numeric_Primitive::apply(Element *args) {
 	ASSERT(a && b && is_null(cddr(args)), "numeric");
 	auto a_i { dynamic_cast<Integer *>(a) };
 	auto b_i { dynamic_cast<Integer *>(b) };
-	if (a_i && b_i) {
-		return do_int(a_i->value(), b_i->value());
-	}
+	if (a_i && b_i) { return do_int(*a_i, *b_i); }
 	Float *a_f { nullptr }; Float *b_f { nullptr };
 	if (! a_i) { a_f = dynamic_cast<Float *>(a); }
 	if (! b_i) { b_f = dynamic_cast<Float *>(b); }
 	if ((a_i || a_f) && (b_i || b_f)) {
-		return do_real(
-			a_f ? a_f->value() : static_cast<double>(a_i->value()),
-			b_f ? b_f->value() : static_cast<double>(b_i->value())
+		return do_float(
+			a_f ? a_f->value() : a_i->float_value(),
+			b_f ? b_f->value() : b_i->float_value()
 		);
 	}
 	ASSERT(false, "numeric");
@@ -651,72 +709,70 @@ Element *Numeric_Primitive::apply(Element *args) {
 
 class Add_Primitive : public Numeric_Primitive {
 	protected:
-		Element *do_int(int a, int b) override {
-			return new Integer { a + b };
+		Element *do_int(const Integer &a, const Integer &b) override {
+			return a + b;
 		}
-		Element *do_real(double a, double b) override {
+		Element *do_float(double a, double b) override {
 			return new Float { a + b };
 		}
 };
 
 class Sub_Primitive : public Numeric_Primitive {
 	protected:
-		Element *do_int(int a, int b) override {
-			return new Integer { a - b };
+		Element *do_int(const Integer &a, const Integer &b) override {
+			return a - b;
 		}
-		Element *do_real(double a, double b) override {
+		Element *do_float(double a, double b) override {
 			return new Float { a - b };
 		}
 };
 
 class Mul_Primitive : public Numeric_Primitive {
 	protected:
-		Element *do_int(int a, int b) override {
-			return new Integer { a * b };
+		Element *do_int(const Integer &a, const Integer &b) override {
+			return a * b;
 		}
-		Element *do_real(double a, double b) override {
+		Element *do_float(double a, double b) override {
 			return new Float { a * b };
 		}
 };
 
 class Div_Primitive : public Numeric_Primitive {
 	protected:
-		Element *do_int(int a, int b) override {
-			ASSERT(b != 0, "div");
-			return new Integer { a / b };
+		Element *do_int(const Integer &a, const Integer &b) override {
+			return a / b;
 		}
-		Element *do_real(double a, double b) override {
+		Element *do_float(double a, double b) override {
 			return new Float { a / b };
 		}
 };
 
 class Remainder_Primitive : public Numeric_Primitive {
 	protected:
-		Element *do_int(int a, int b) override {
-			ASSERT(b != 0, "remainder");
-			return new Integer { a % b };
+		Element *do_int(const Integer &a, const Integer &b) override {
+			return a % b;
 		}
-		Element *do_real(double a, double b) override {
+		Element *do_float(double a, double b) override {
 			ASSERT(false, "remainder");
 		}
 };
 
 class Less_Primitive : public Numeric_Primitive {
 	protected:
-		Element *do_int(int a, int b) override {
-			return to_bool(a < b);
+		Element *do_int(const Integer &a, const Integer &b) override {
+			return a < b;
 		}
-		Element *do_real(double a, double b) override {
+		Element *do_float(double a, double b) override {
 			return to_bool(a < b);
 		}
 };
 
 class Equal_Primitive : public Numeric_Primitive {
 	protected:
-		Element *do_int(int a, int b) override {
-			return to_bool(a == b);
+		Element *do_int(const Integer &a, const Integer &b) override {
+			return a == b;
 		}
-		Element *do_real(double a, double b) override {
+		Element *do_float(double a, double b) override {
 			return to_bool(a == b);
 		}
 };
