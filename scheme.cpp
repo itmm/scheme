@@ -67,21 +67,20 @@ class Integer : public Element {
 	public:
 		using Digits = std::vector<char>;
 	private:
-		unsigned value_;
 		Digits digits_;
 		void push_digits(unsigned value) {
 			if (value) {
-				digits_.push_back('0' + (value % 10));
+				digits_.push_back(value % 10);
 				push_digits(value / 10);
 			}
 		}
 		void normalize() {
-			while (! digits_.empty() && digits_.back() == '0') {
+			while (! digits_.empty() && digits_.back() == 0) {
 				digits_.pop_back();
 			}
 		}
 	public:
-		Integer(unsigned value): value_ { value } {
+		Integer(unsigned value) {
 			push_digits(value);
 		}
 		Integer(const Digits &digits): digits_ { digits } {
@@ -90,12 +89,19 @@ class Integer : public Element {
 		Integer(Digits &&digits): digits_ { std::move(digits) } {
 			normalize();
 		}
-		unsigned int_value() const { return value_; }
+		unsigned int_value() const {
+			unsigned result { 0 };
+			for (const auto &c: digits_) {
+				result = result * 10 + c;
+			}
+			return result;
+		}
 		const Digits &digits() const { return digits_; }
-		double float_value() const { return static_cast<double>(value_); }
+		double float_value() const { return static_cast<double>(int_value()); }
+		bool zero() const { return digits_.empty(); }
 		std::ostream &write(std::ostream &out) const override {
 			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
-				out << *i;
+				out << static_cast<char>('0' + *i);
 			}
 			return out;
 		}
@@ -134,10 +140,10 @@ Integer *operator+(const Integer &a, const Integer &b) {
 	for (;;) {
 		if (a_i == a.digits().end() && b_i == b.digits().end() && ! carry) { break; }
 		int v { carry };
-		if (a_i != a.digits().end()) { v += *a_i++ - '0'; }
-		if (b_i != b.digits().end()) { v += *b_i++ - '0'; }
+		if (a_i != a.digits().end()) { v += *a_i++; }
+		if (b_i != b.digits().end()) { v += *b_i++; }
 		if (v >= 10) { v -= 10; carry = 1; } else { carry = 0; }
-		digits.push_back(v + '0');
+		digits.push_back(v);
 	}
 
 	return new Integer { std::move(digits) };
@@ -151,35 +157,6 @@ Integer *operator-(const Integer &a) {
 	}
 }
 
-Integer *operator-(const Integer &a, const Integer &b) {
-	auto a_neg { a.negative() };
-	auto b_neg { b.negative() };
-	if (! a_neg && b_neg) {
-		return a + *(-b);
-	} else if (a_neg && b_neg) {
-		return -*(*(-a) - *(-b));
-	} else if (a_neg && ! b_neg) {
-		return -*(*(-a) + b);
-	}
-	if (a.int_value() < b.int_value()) {
-		return new Negative_Integer { b.int_value() - a.int_value() };
-	}
-
-	Integer::Digits digits;
-	auto a_i { a.digits().begin() };
-	auto b_i { b.digits().begin() };
-	int carry { 0 };
-	for (;;) {
-		if (a_i == a.digits().end()) { break; }
-		int v = { *a_i++ - '0' + carry };
-		if (b_i != b.digits().end()) { v -= *b_i++ - '0'; }
-		if (v < 0) { v += 10; carry = -1; } else { carry = 0; }
-		digits.push_back(v + '0');
-	}
-
-	return new Integer { std::move(digits) };
-}
-
 Integer *operator*(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
@@ -190,7 +167,25 @@ Integer *operator*(const Integer &a, const Integer &b) {
 	} else if (! a_neg && b_neg) {
 		return -*(a * *(-b));
 	}
-	return new Integer(a.int_value() * b.int_value());
+	Integer::Digits digits;
+	auto a_i { a.digits().begin() };
+	int offset { 0 };
+	for (; a_i != a.digits().end(); ++a_i, ++offset) {
+		auto b_i { b.digits().begin() };
+		int mult { *a_i };
+		int carry { 0 };
+		int i { 0 };
+		while (b_i != b.digits().end() || carry) {
+			int idx { offset + i++ };
+			while (idx >= digits.size()) { digits.push_back(0); }
+			int value { carry + digits[idx] };
+			if (b_i != b.digits().end()) { value += (*b_i++) * mult; }
+			carry = value / 10;
+			digits[idx] = value % 10;
+		}
+	}
+
+	return new Integer { std::move(digits) };
 }
 
 Integer *operator/(const Integer &a, const Integer &b) {
@@ -203,7 +198,7 @@ Integer *operator/(const Integer &a, const Integer &b) {
 	} else if (! a_neg && b_neg) {
 		return -*(a / *(-b));
 	}
-	ASSERT(b.int_value(), "int/");
+	ASSERT(! b.zero(), "int/");
 	return new Integer(a.int_value() / b.int_value());
 }
 
@@ -232,21 +227,80 @@ Element *to_bool(bool cond) {
 		dynamic_cast<Element *>(&False);
 }
 
+bool is_true(Element *value) {
+	if (! value) { err("is_true", "no value"); }
+	return value && value != &Null;
+}
+
+bool is_false(Element *value) {
+	if (! value) { err("is_false", "no value"); }
+	return value == &Null;
+}
+
 Element *operator<(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
-	auto b_neg { a.negative() };
+	auto b_neg { b.negative() };
 	if (a_neg && b_neg) {
-		return to_bool(b.int_value() < a.int_value());
+		return *(-b) < *(-a);
 	} else if (a_neg && ! b_neg) {
-		return to_bool(a.int_value() || b.int_value());
+		return to_bool(! a.zero() || ! b.zero());
 	} else if (! a_neg && b_neg) {
 		return to_bool(false);
 	}
-	return to_bool(a.int_value() < b.int_value());
+	if (a.digits().size() > b.digits().size()) { return to_bool(false); }
+	if (a.digits().size() < b.digits().size()) { return to_bool(true); }
+
+	auto a_i { a.digits().rbegin() };
+	auto b_i { b.digits().rbegin() };
+	for (; a_i != a.digits().rend(); ++a_i, ++b_i) {
+		if (*a_i < *b_i) { return to_bool(true); }
+		if (*a_i > *b_i) { return to_bool(false); }
+	}
+	return to_bool(false);
+}
+
+Integer *operator-(const Integer &a, const Integer &b) {
+	auto a_neg { a.negative() };
+	auto b_neg { b.negative() };
+	if (! a_neg && b_neg) {
+		return a + *(-b);
+	} else if (a_neg && b_neg) {
+		return -*(*(-a) - *(-b));
+	} else if (a_neg && ! b_neg) {
+		return -*(*(-a) + b);
+	}
+	if (is_true(a < b)) {
+		return new Negative_Integer { b.int_value() - a.int_value() };
+	}
+
+	Integer::Digits digits;
+	auto a_i { a.digits().begin() };
+	auto b_i { b.digits().begin() };
+	int carry { 0 };
+	for (;;) {
+		if (a_i == a.digits().end()) { break; }
+		int v = { *a_i++ + carry };
+		if (b_i != b.digits().end()) { v -= *b_i++; }
+		if (v < 0) { v += 10; carry = -1; } else { carry = 0; }
+		digits.push_back(v);
+	}
+
+	return new Integer { std::move(digits) };
 }
 
 Element *operator==(const Integer &a, const Integer &b) {
-	return to_bool(a.negative() == b.negative() && a.int_value() == b.int_value());
+	if (a.negative() != b.negative()) {
+		return to_bool(a.zero() && b.zero());
+	}
+	if (a.digits().size() != b.digits().size()) {
+		return to_bool(false);
+	}
+	auto a_i { a.digits().begin() };
+	auto b_i { b.digits().begin() };
+	for (; a_i != a.digits().end(); ++a_i, ++b_i) {
+		if (*a_i != *b_i) { return to_bool(false); }
+	}
+	return to_bool(true);
 }
 
 std::ostream &Pair::write(std::ostream &out) const {
@@ -629,16 +683,6 @@ inline bool is_or_special(Pair *lst) {
 
 inline bool is_quote_special(Pair *lst) {
 	return is_tagged_list(lst, "quote");
-}
-
-bool is_true(Element *value) {
-	if (! value) { err("is_true", "no value"); }
-	return value && value != &Null;
-}
-
-bool is_false(Element *value) {
-	if (! value) { err("is_false", "no value"); }
-	return value == &Null;
 }
 
 Element *eval(Element *exp, Frame *env) {
