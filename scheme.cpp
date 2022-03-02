@@ -89,15 +89,14 @@ class Integer : public Element {
 		Integer(Digits &&digits): digits_ { std::move(digits) } {
 			normalize();
 		}
-		unsigned int_value() const {
-			unsigned result { 0 };
+		const Digits &digits() const { return digits_; }
+		double float_value() const { 
+			double result { 0.0 };
 			for (const auto &c: digits_) {
-				result = result * 10 + c;
+				result = result * 10.0 + c;
 			}
 			return result;
 		}
-		const Digits &digits() const { return digits_; }
-		double float_value() const { return static_cast<double>(int_value()); }
 		bool zero() const { return digits_.empty(); }
 		std::ostream &write(std::ostream &out) const override {
 			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
@@ -205,7 +204,9 @@ class Pair : public Element {
 
 Pair Null { &Null, &Null };
 #define False Null
-Integer True { 1 };
+Integer One { 1 };
+#define True One
+Integer Zero { 0 };
 
 Element *to_bool(bool cond) {
 	return cond ?
@@ -245,6 +246,18 @@ Element *operator<(const Integer &a, const Integer &b) {
 	return to_bool(false);
 }
 
+static Integer *half(const Integer &num) {
+	Integer::Digits result;
+	result.resize(num.digits().size());
+	int carry { 0 };
+	for (int i { static_cast<int>(num.digits().size()) - 1}; i >= 0; --i) {
+		int v { carry + num.digits()[i] };
+		if (v % 2) { carry = 10; v -= 1; } else { carry = 0; }
+		result[i] = v/2;
+	}
+	return new Integer { std::move(result) };
+}
+
 Integer *operator/(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
@@ -256,8 +269,19 @@ Integer *operator/(const Integer &a, const Integer &b) {
 		return -*(a / *(-b));
 	}
 	ASSERT(! b.zero(), "int/");
-	if (is_true(a < b)) { return Zero; }
-	return new Integer(a.int_value() / b.int_value());
+	if (is_true(a < b)) { return &Zero; }
+	Integer *min { &One };
+	Integer *max { b * b };
+	Integer *two { new Integer { 2 } };
+	while (is_true(*(*max * b) < a)) { max = *max * *max; }
+	while (is_true(One < *(*max - *min))) {
+		Integer *mid { half(*(*max + *min)) };
+		Integer *prod { *mid * b };
+		if (is_true(*prod < a)) { min = mid; }
+		else if (is_true(a < *prod)) { max = mid; }
+		else { return mid; }
+	}
+	return min;
 }
 
 Integer *operator-(const Integer &a, const Integer &b) {
@@ -271,7 +295,8 @@ Integer *operator-(const Integer &a, const Integer &b) {
 		return -*(*(-a) + b);
 	}
 	if (is_true(a < b)) {
-		return new Negative_Integer { b.int_value() - a.int_value() };
+		auto diff { b - a };
+		return new Negative_Integer { diff->digits() };
 	}
 
 	Integer::Digits digits;
@@ -929,7 +954,7 @@ Element *Garbage_Collect_Primitive::apply(Element *args) {
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
-		if (cur != &Null && cur != &True && cur->get_mark() != current_mark) {
+		if (cur != &Null && cur != &True && cur != &Zero && cur->get_mark() != current_mark) {
 			++collected;
 			auto tmp { cur->next() };
 			delete cur;
