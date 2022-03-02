@@ -54,7 +54,7 @@ class Error : public Element {
 			raiser_ { raiser }, message_ { message }, data_ { data }
 		{ }
 		std::ostream &write(std::ostream &out) const override {
-			return out << "(#error " << raiser_ << ": " << message_;
+			out << "(#error " << raiser_ << ": " << message_;
 			if (data_) {
 				out << ": " << data_;
 			}
@@ -539,6 +539,7 @@ class Frame : public Element {
 	public:
 		Frame(Frame *next): next_ { next } { }
 		void insert(const std::string &key, Element *value);
+		bool has(const std::string &key) const;
 		Element *get(const std::string &key) const;
 		std::ostream &write(std::ostream &out) const override {
 			return out << "#frame";
@@ -547,6 +548,12 @@ class Frame : public Element {
 
 void Frame::insert(const std::string &key, Element *value) {
 	elements_[key] = value;
+}
+
+bool Frame::has(const std::string &key) const {
+	auto it { elements_.find(key) };
+	return it != elements_.end() ? true :
+		next_ ? next_->has(key) : false;
 }
 
 Element *Frame::get(const std::string &key) const {
@@ -589,13 +596,13 @@ Element *eval(Element *exp, Frame *env);
 
 Element *car(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
-	//ASSERT(pair || !lst, "car");
+	ASSERT(pair || !lst, "car");
 	return pair ? pair->head() : nullptr;
 }
 
 Element *cdr(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
-	//ASSERT(pair || !lst, "cdr");
+	ASSERT(pair || !lst, "cdr");
 	return pair ? pair->rest() : nullptr;
 }
 
@@ -614,16 +621,23 @@ bool is_null(Element *element) {
 	return ! element;
 }
 
+bool is_pair(Element *elm) {
+	return !elm || dynamic_cast<Pair *>(elm);
+}
+
+Symbol *assert_sym(Element *elm) {
+	auto sym { dynamic_cast<Symbol *>(elm) };
+	if (! sym) { err("assert_sym", "no symbol", elm); }
+	return sym;
+}
+
 Element *Procedure::apply(Element *arg_values) {
 	auto new_env { new Frame { env_ } };
 
 	Element *cur { args_ };
 	ASSERT(is_good(cur), "procedure");
-	auto cur_pair { dynamic_cast<Pair *>(cur) };
-	for (; is_good(cur_pair) && cur_pair; cur = cdr(cur),
-		cur_pair = dynamic_cast<Pair *>(cur)
-	) {
-		auto sym { dynamic_cast<Symbol *>(car(cur)) };
+	for (; is_pair(cur) && cur; cur = cdr(cur)) {
+		auto sym { assert_sym(car(cur)) };
 		ASSERT(sym, "procedure");
 		auto value { car(arg_values) };
 		ASSERT(is_good(value), "procedure");
@@ -632,19 +646,16 @@ Element *Procedure::apply(Element *arg_values) {
 	}
 	ASSERT(is_good(cur), "procedure");
 	if (cur) {
-		auto sym { dynamic_cast<Symbol *>(cur) };
+		auto sym { assert_sym(cur) };
 		ASSERT(sym, "procedure");
 		ASSERT(is_good(arg_values), "procedure");
 		new_env->insert(sym->value(), arg_values);
 	}
 
 	cur = body_;
-	cur_pair = dynamic_cast<Pair *>(cur);
 	Element *value { nullptr };
-	for (; is_good(cur_pair) && cur_pair; cur = cdr(cur),
-		cur_pair = dynamic_cast<Pair *>(cur)
-	) {
-		Element *statement { car(cur_pair) };
+	for (; is_pair(cur) && cur; cur = cdr(cur)) {
+		Element *statement { car(cur) };
 		ASSERT(is_good(statement), "procedure");
 		value = eval(statement, new_env);
 	}
@@ -803,8 +814,7 @@ Element *eval(Element *exp, Frame *env) {
 	if (float_value) { return float_value; }
 	auto sym_value { dynamic_cast<Symbol *>(exp) };
 	if (sym_value) {
-		Element *got { env->get(sym_value->value()) };
-		return got ?: exp;
+		return env->has(sym_value->value()) ? env->get(sym_value->value()) : exp;
 	}
 	auto lst_value { dynamic_cast<Pair *>(exp) };
 	if (lst_value) {
@@ -960,7 +970,7 @@ Element *Numeric_Primitive::apply(Element *args) {
 			b_f ? b_f->value() : b_i->float_value()
 		);
 	}
-	ASSERT(false, "numeric");
+	return err("numeric", "invalid arguments", args);
 }
 
 class Add_Primitive : public Numeric_Primitive {
