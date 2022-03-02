@@ -1,8 +1,11 @@
 .PHONY: clean
 
-CXXFLAGS += -g
+CXXFLAGS += -g -Wall
 
 scheme:
+
+scheme.cpp: $(wildcard *.h)
+	touch $@
 
 clean:
 	rm -f scheme
