@@ -13,6 +13,9 @@ class Element {
 	protected:
 		virtual void propagate_mark() { }
 			
+		void mark(Element *elm) {
+			if (elm) { mark(elm); }
+		}
 	public:
 		Element(): next_ { all_elements}, mark_ { current_mark } {
 			all_elements = this;
@@ -34,7 +37,7 @@ inline std::ostream &operator<<(std::ostream &out, Element *elm) {
 	if (elm) {
 		return elm->write(out);
 	} else {
-		return out << "#null";
+		return out << "()";
 	}
 }
 
@@ -244,32 +247,28 @@ class Pair : public Element {
 		std::ostream &write(std::ostream &out) const override;
 };
 
-Pair Null { &Null, &Null };
-#define False Null
 Integer One { 1 };
 #define True One
 Integer Zero { 0 };
 
 Element *to_bool(bool cond) {
-	return cond ?
-		dynamic_cast<Element *>(&True) :
-		dynamic_cast<Element *>(&False);
+	return cond ?  &True : nullptr;
 }
 
 bool is_err(Element *element) {
-	return ! element || dynamic_cast<Error *>(element);
+	return dynamic_cast<Error *>(element);
 }
 
 bool is_good(Element *element) { return ! is_err(element); }
 
 bool is_true(Element *value) {
 	if (is_err(value)) { err("is_true", "no value"); }
-	return is_good(value) && value != &Null;
+	return is_good(value) && value;
 }
 
 bool is_false(Element *value) {
 	if (is_err(value)) { err("is_false", "no value"); }
-	return value == &Null;
+	return ! value;
 }
 
 Element *operator<(const Integer &a, const Integer &b) {
@@ -429,7 +428,7 @@ std::ostream &Pair::write(std::ostream &out) const {
 	out << '(';
 	bool first { true };
 	const Pair *cur { this };
-	while (cur && cur != &Null) {
+	while (cur) {
 		if (first) { first = false; } else { out << ' '; }
 		out << cur->head_;
 		auto nxt { dynamic_cast<Pair *>(cur->rest_) };
@@ -455,7 +454,7 @@ Element *read_list(std::istream &in) {
 	if (ch == EOF) { return err("read_list", "incomplete_list"); }
 	if (ch == ')') {
 		ch = in.get();
-		return &Null;
+		return nullptr;
 	}
 	auto exp { read_expression(in) };
 	auto sym { dynamic_cast<Symbol *>(exp) };
@@ -590,19 +589,19 @@ Element *eval(Element *exp, Frame *env);
 
 Element *car(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
-	ASSERT(pair, "car");
-	return pair->head();
+	//ASSERT(pair || !lst, "car");
+	return pair ? pair->head() : nullptr;
 }
 
 Element *cdr(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
-	ASSERT(pair, "cdr");
-	return pair->rest();
+	//ASSERT(pair || !lst, "cdr");
+	return pair ? pair->rest() : nullptr;
 }
 
 std::ostream &Procedure::write(std::ostream &out) const {
 	out << "(lambda " << args_;
-	for (Element *cur { body_ }; cur && cur != &Null; cur = cdr(cur)) {
+	for (Element *cur { body_ }; cur; cur = cdr(cur)) {
 		auto v { car(cur) };
 		out << ' ' << v;
 	}
@@ -612,42 +611,42 @@ std::ostream &Procedure::write(std::ostream &out) const {
 
 bool is_null(Element *element) {
 	if (is_err(element)) { err("is_null", "no argument"); }
-	return element == &Null;
+	return ! element;
 }
 
 Element *Procedure::apply(Element *arg_values) {
 	auto new_env { new Frame { env_ } };
 
 	Element *cur { args_ };
+	ASSERT(is_good(cur), "procedure");
 	auto cur_pair { dynamic_cast<Pair *>(cur) };
-	for (; is_good(cur_pair) && cur_pair != &Null; cur = cdr(cur),
+	for (; is_good(cur_pair) && cur_pair; cur = cdr(cur),
 		cur_pair = dynamic_cast<Pair *>(cur)
 	) {
 		auto sym { dynamic_cast<Symbol *>(car(cur)) };
 		ASSERT(sym, "procedure");
 		auto value { car(arg_values) };
-		ASSERT(value, "procedure");
+		ASSERT(is_good(value), "procedure");
 		new_env->insert(sym->value(), value);
 		arg_values = cdr(arg_values);
 	}
 	ASSERT(is_good(cur), "procedure");
-	if (cur != &Null) {
+	if (cur) {
 		auto sym { dynamic_cast<Symbol *>(cur) };
 		ASSERT(sym, "procedure");
-		ASSERT(arg_values, "procedure");
+		ASSERT(is_good(arg_values), "procedure");
 		new_env->insert(sym->value(), arg_values);
 	}
 
 	cur = body_;
 	cur_pair = dynamic_cast<Pair *>(cur);
-	Element *value = &Null;
-	for (; is_good(cur_pair) && cur_pair != &Null; cur = cdr(cur),
+	Element *value { nullptr };
+	for (; is_good(cur_pair) && cur_pair; cur = cdr(cur),
 		cur_pair = dynamic_cast<Pair *>(cur)
 	) {
 		Element *statement { car(cur_pair) };
-		ASSERT(statement, "procedure");
+		ASSERT(is_good(statement), "procedure");
 		value = eval(statement, new_env);
-		ASSERT(value, "procedure");
 	}
 	ASSERT(is_null(cur), "procedure");
 	return value;
@@ -662,7 +661,7 @@ Element *apply(Element *op, Element *operands) {
 }
 
 Element *eval_list(Element *exp, Frame *env) {
-	if (is_err(exp) || exp == &Null) { return exp; }
+	if (is_err(exp) || ! exp) { return exp; }
 	auto head { eval(car(exp), env) };
 	auto rest { dynamic_cast<Pair *>(cdr(exp)) };
 	if (rest) {
@@ -674,7 +673,7 @@ Element *eval_list(Element *exp, Frame *env) {
 
 bool is_tagged_list(Pair *lst, const std::string &tag) {
 	auto sym { dynamic_cast<Symbol *>(car(lst)) };
-	return sym != nullptr && sym->value() == tag;
+	return sym && sym->value() == tag;
 }
 
 inline bool is_define_special(Pair *lst) {
@@ -756,14 +755,14 @@ inline bool is_cond_special(Pair *lst) {
 }
 
 Element *build_cond(Element *lst) {
-	if (is_err(lst) || lst == &Null) { return lst; }
+	if (is_err(lst) || ! lst) { return lst; }
 	auto expr { car(lst) };
 	auto cond { car(expr) };
 	auto cons { cdr(expr) };
-	ASSERT(cond && cons, "cond");
+	ASSERT(is_good(cond) && is_good(cons), "cond");
 	auto sym { dynamic_cast<Symbol *>(cond) };
 	if (sym && sym->value() == "else") {
-		if (cdr(lst) != &Null) {
+		if (cdr(lst)) {
 			return err("cond", "else not in last case");
 		}
 		return new Pair { new Symbol { "begin" }, cons };
@@ -774,7 +773,7 @@ Element *build_cond(Element *lst) {
 			cond,
 			new Pair {
 				new Pair { new Symbol { "begin" }, cons },
-				new Pair { build_cond(cdr(lst)), &Null }
+				new Pair { build_cond(cdr(lst)), nullptr }
 			}
 		}
 	};
@@ -797,7 +796,7 @@ inline bool is_quote_special(Pair *lst) {
 }
 
 Element *eval(Element *exp, Frame *env) {
-	if (is_err(exp) || exp == &Null) { return exp; }
+	if (is_err(exp) || ! exp) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
 	if (int_value) { return int_value; }
 	auto float_value { dynamic_cast<Float *>(exp) };
@@ -837,9 +836,9 @@ Element *eval(Element *exp, Frame *env) {
 			return eval(expr, env);
 		}
 		if (is_begin_special(lst_value)) {
-			Element *result;
+			Element *result { nullptr };
 			auto cur { cdr(lst_value) };
-			for (; is_good(cur) && cur != &Null; cur = cdr(cur)) {
+			for (; is_good(cur) && cur; cur = cdr(cur)) {
 				result = eval(car(cur), env);
 				ASSERT(is_good(result), "begin");
 			}
@@ -848,7 +847,7 @@ Element *eval(Element *exp, Frame *env) {
 		if (is_and_special(lst_value)) {
 			auto cur { cdr(lst_value) };
 			Element *result { &True };
-			for (; is_good(cur) && cur != &Null; cur = cdr(cur)) {
+			for (; is_good(cur) && cur; cur = cdr(cur)) {
 				result = eval(car(cur), env);
 				ASSERT(is_good(result), "and");
 				if (is_false(result)) { break; }
@@ -857,8 +856,8 @@ Element *eval(Element *exp, Frame *env) {
 		}
 		if (is_or_special(lst_value)) {
 			auto cur { cdr(lst_value) };
-			Element *result { &False };
-			for (; is_good(cur) && cur != &Null; cur = cdr(cur)) {
+			Element *result { nullptr };
+			for (; is_good(cur) && cur; cur = cdr(cur)) {
 				result = eval(car(cur), env);
 				ASSERT(is_good(result), "or");
 				if (is_true(result)) { break; }
@@ -913,7 +912,7 @@ Element *Cons_Primitive::apply(Element *args) {
 	Element *nxt { cdr(args) };
 	Element *second { car(nxt) };
 	nxt = cdr(nxt);
-	ASSERT(first && second && is_null(nxt), "cons");
+	ASSERT(is_good(first) && is_good(second) && is_null(nxt), "cons");
 	return new Pair { first, second };
 }
 
@@ -1039,7 +1038,7 @@ Element *Garbage_Collect_Primitive::apply(Element *args) {
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
-		if (cur != &Null && cur != &One && cur != &Zero && cur->get_mark() != current_mark) {
+		if (cur != &One && cur != &Zero && cur->get_mark() != current_mark) {
 			++collected;
 			auto tmp { cur->next() };
 			delete cur;
@@ -1061,7 +1060,7 @@ Element *Garbage_Collect_Primitive::apply(Element *args) {
 				new Symbol { "kept" },
 				new Pair {
 					new Integer { kept },
-					&Null
+					nullptr
 				}
 			}
 		}
