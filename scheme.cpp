@@ -371,15 +371,13 @@ Element *read_list(std::istream &in) {
 		return &Null;
 	}
 	auto exp { read_expression(in) };
-	eat_space(in);
-	if (ch == '.') {
-		ch = in.get();
-		auto result { new Pair { exp, read_expression(in) } };
+	auto sym { dynamic_cast<Symbol *>(exp) };
+	if (sym && sym->value() == ".") {
+		auto result { read_expression(in) };
 		eat_space(in);
 		ASSERT(ch == ')', "read_list");
 		ch = in.get();
 		return result;
-
 	}
 	return new Pair { exp, read_list(in) };
 }
