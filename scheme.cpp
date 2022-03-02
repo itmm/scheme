@@ -1,36 +1,31 @@
 #include <iostream>
-#include <string>
-#include <sstream>
-
-class Element;
-Element *all_elements { nullptr };
-bool current_mark { true };
 
 class Element {
 		Element *next_;
 		bool mark_;
 
-	protected:
-		virtual void propagate_mark() { }
-			
-		void mark(Element *elm) {
-			if (elm) { elm->mark(); }
-		}
-	public:
-		Element(): next_ { all_elements}, mark_ { current_mark } {
-			all_elements = this;
-		}
-		virtual ~Element() { }
-		virtual std::ostream &write(std::ostream &out) const = 0;
+		static Element *all_elements;
+		static bool current_mark;
+
 		void mark() {
 			if (mark_ != current_mark) {
 				mark_ = current_mark;
 				propagate_mark();
 			}
 		}
-		bool get_mark() const { return mark_; }
-		Element *next() { return next_; }
-		void set_next(Element *n) { next_ = n; }
+
+	protected:
+		virtual void propagate_mark() { }
+			
+		void mark(Element *elm) { if (elm) { elm->mark(); } }
+
+	public:
+		Element(): next_ { all_elements }, mark_ { current_mark } {
+			all_elements = this;
+		}
+		virtual ~Element() { }
+		virtual std::ostream &write(std::ostream &out) const = 0;
+		static std::pair<unsigned, unsigned> garbage_collect();
 };
 
 inline std::ostream &operator<<(std::ostream &out, Element *elm) {
@@ -40,6 +35,8 @@ inline std::ostream &operator<<(std::ostream &out, Element *elm) {
 		return out << "()";
 	}
 }
+
+#include <string>
 
 class Error : public Element {
 		std::string raiser_;
@@ -65,6 +62,20 @@ class Error : public Element {
 		}
 };
 
+Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
+	auto er { new Error { fn, msg, exp } };
+	std::cerr << er << '\n';
+	return er;
+}
+
+#define ASSERT(CND, FN) if (! (CND)) { return err((FN), "no " #CND); }
+
+bool is_err(Element *element) {
+	return dynamic_cast<Error *>(element);
+}
+
+bool is_good(Element *element) { return ! is_err(element); }
+
 template<typename VALUE_TYPE>
 class Value_Element : public Element {
 		VALUE_TYPE value_;
@@ -78,14 +89,6 @@ class Value_Element : public Element {
 
 using Symbol = Value_Element<std::string>;
 using Float = Value_Element<double>;
-
-Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
-	auto er { new Error { fn, msg, exp } };
-	std::cerr << er << '\n';
-	return er;
-}
-
-#define ASSERT(CND, FN) if (! (CND)) { return err((FN), "no " #CND); }
 
 #include <vector>
 
@@ -232,44 +235,6 @@ Element *operator*(const Integer &a, const Integer &b) {
 	return new Integer { std::move(digits) };
 }
 
-class Pair : public Element {
-		Element *head_;
-		Element *rest_;
-	protected:
-		void propagate_mark() override {
-			mark(head_); mark(rest_);
-		}
-	public:
-		Pair(Element *head, Element *rest): head_ { head }, rest_ { rest } { }
-		Element *head() const { return head_; }
-		Element *rest() const { return rest_; }
-		std::ostream &write(std::ostream &out) const override;
-};
-
-Integer One { 1 };
-#define True One
-Integer Zero { 0 };
-
-Element *to_bool(bool cond) {
-	return cond ?  &True : nullptr;
-}
-
-bool is_err(Element *element) {
-	return dynamic_cast<Error *>(element);
-}
-
-bool is_good(Element *element) { return ! is_err(element); }
-
-bool is_true(Element *value) {
-	if (is_err(value)) { err("is_true", "no value"); }
-	return is_good(value) && value;
-}
-
-bool is_false(Element *value) {
-	if (is_err(value)) { err("is_false", "no value"); }
-	return ! value;
-}
-
 bool operator<(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
@@ -306,6 +271,9 @@ static Integer *half(const Integer &num) {
 	}
 	return new Integer { std::move(result) };
 }
+
+Integer One { 1 };
+Integer Zero { 0 };
 
 Element *operator/(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
@@ -417,6 +385,36 @@ bool operator==(const Integer &a, const Integer &b) {
 	return true;
 }
 
+#define True One
+
+Element *to_bool(bool cond) {
+	return cond ?  &True : nullptr;
+}
+
+bool is_true(Element *value) {
+	if (is_err(value)) { err("is_true", "no value"); }
+	return is_good(value) && value;
+}
+
+bool is_false(Element *value) {
+	if (is_err(value)) { err("is_false", "no value"); }
+	return ! value;
+}
+
+class Pair : public Element {
+		Element *head_;
+		Element *rest_;
+	protected:
+		void propagate_mark() override {
+			mark(head_); mark(rest_);
+		}
+	public:
+		Pair(Element *head, Element *rest): head_ { head }, rest_ { rest } { }
+		Element *head() const { return head_; }
+		Element *rest() const { return rest_; }
+		std::ostream &write(std::ostream &out) const override;
+};
+
 std::ostream &Pair::write(std::ostream &out) const {
 	auto sym { dynamic_cast<Symbol *>(head_) };
 	if (sym && sym->value() == "quote") {
@@ -438,6 +436,38 @@ std::ostream &Pair::write(std::ostream &out) const {
 	}
 	out << ')';
 	return out;
+}
+
+Element *car(Element *lst) {
+	auto pair { dynamic_cast<Pair *>(lst) };
+	ASSERT(pair || !lst, "car");
+	return pair ? pair->head() : nullptr;
+}
+
+Element *cdr(Element *lst) {
+	auto pair { dynamic_cast<Pair *>(lst) };
+	ASSERT(pair || !lst, "cdr");
+	return pair ? pair->rest() : nullptr;
+}
+
+Element *cadr(Element *lst) { return car(cdr(lst)); }
+
+Element *cddr(Element *lst) { return cdr(cdr(lst)); }
+
+Element *caddr(Element *lst) { return car(cddr(lst)); }
+
+Element *cdddr(Element *lst) { return cdr(cddr(lst)); }
+
+Element *cadddr(Element *lst) { return car(cdddr(lst)); }
+
+Element *cddddr(Element *lst) { return cdr(cdddr(lst)); }
+
+bool is_null(Element *element) {
+	return ! element;
+}
+
+bool is_pair(Element *elm) {
+	return dynamic_cast<Pair *>(elm);
 }
 
 static int ch { ' ' };
@@ -493,6 +523,8 @@ bool is_float(const std::string &v) {
 double float_value(const std::string &v) {
 	return std::stod(v);
 }
+
+#include <sstream>
 
 Element *read_expression(std::istream &in) {
 	eat_space(in);
@@ -591,20 +623,6 @@ class Procedure : public Element {
 		std::ostream &write(std::ostream &out) const override;
 };
 
-Element *eval(Element *exp, Frame *env);
-
-Element *car(Element *lst) {
-	auto pair { dynamic_cast<Pair *>(lst) };
-	ASSERT(pair || !lst, "car");
-	return pair ? pair->head() : nullptr;
-}
-
-Element *cdr(Element *lst) {
-	auto pair { dynamic_cast<Pair *>(lst) };
-	ASSERT(pair || !lst, "cdr");
-	return pair ? pair->rest() : nullptr;
-}
-
 std::ostream &Procedure::write(std::ostream &out) const {
 	out << "(lambda " << args_;
 	for (Element *cur { body_ }; cur; cur = cdr(cur)) {
@@ -615,23 +633,25 @@ std::ostream &Procedure::write(std::ostream &out) const {
 	return out;
 }
 
-bool is_null(Element *element) {
-	if (is_err(element)) { err("is_null", "no argument"); }
-	return ! element;
-}
-
-bool is_pair(Element *elm) {
-	return dynamic_cast<Pair *>(elm);
-}
-
 Symbol *assert_sym(Element *elm) {
 	auto sym { dynamic_cast<Symbol *>(elm) };
 	if (! sym) { err("assert_sym", "no symbol", elm); }
 	return sym;
 }
 
+Element *eval(Element *exp, Frame *env);
+
+std::vector<Frame *> active_frames;
+
+class Frame_Guard {
+	public:
+		Frame_Guard(Frame *frame) { active_frames.push_back(frame); }
+		~Frame_Guard() { active_frames.pop_back(); }
+};
+
 Element *Procedure::apply(Element *arg_values) {
 	auto new_env { new Frame { env_ } };
+	Frame_Guard fg { new_env };
 
 	Element *cur { args_ };
 	ASSERT(is_good(cur), "procedure");
@@ -690,10 +710,6 @@ inline bool is_define_special(Pair *lst) {
 	return is_tagged_list(lst, "define");
 }
 
-Element *cadr(Element *lst) {
-	return car(cdr(lst));
-}
-
 inline Element *define_key(Pair *lst) {
 	auto first { cadr(lst) };
 	auto sym { dynamic_cast<Symbol *>(first) };
@@ -707,27 +723,12 @@ inline Element *define_key(Pair *lst) {
 	ASSERT(false, "define key");
 }
 
-Element *cddr(Element *lst) {
-	return cdr(cdr(lst));
-}
-
-Element *caddr(Element *lst) {
-	return car(cddr(lst));
-}
-
-Element *cdddr(Element *lst) {
-	return cdr(cddr(lst));
-}
-
-Element *cadddr(Element *lst) {
-	return car(cdddr(lst));
-}
-
 inline Element *define_value(Pair *lst, Frame *env) {
 	auto args { dynamic_cast<Pair *>(cadr(lst)) };
 	if (args) {
 		return new Procedure { cdr(args), cddr(lst), env };
 	} else {
+		ASSERT(is_null(cdddr(lst)), "define");
 		return eval(caddr(lst), env);
 	}
 }
@@ -765,7 +766,7 @@ inline bool is_cond_special(Pair *lst) {
 }
 
 Element *build_cond(Element *lst) {
-	if (is_err(lst) || ! lst) { return lst; }
+	if (is_err(lst) || is_null(lst)) { return lst; }
 	auto expr { car(lst) };
 	auto cond { car(expr) };
 	auto cons { cdr(expr) };
@@ -833,6 +834,7 @@ Element *eval(Element *exp, Frame *env) {
 		if (is_if_special(lst_value)) {
 			auto condition { eval(if_condition(lst_value), env) };
 			ASSERT(is_good(condition), "if");
+			ASSERT(is_null(cddddr(lst_value)), "if");
 			if (is_true(condition)) {
 				return eval(if_consequence(lst_value), env);
 			} else {
@@ -1032,49 +1034,59 @@ class Equal_Primitive : public Numeric_Primitive {
 
 Frame initial_frame { nullptr };
 
-class Garbage_Collect_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-};
+Element *Element::all_elements { nullptr };
+bool Element::current_mark { true };
 
-Element *Garbage_Collect_Primitive::apply(Element *args) {
+std::pair<unsigned, unsigned> Element::garbage_collect() {
 	current_mark = ! current_mark;
-	initial_frame.mark();
+	for (auto &f : active_frames) { f->mark(); }
+
 	unsigned kept { 0 };
 	unsigned collected { 0 };
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
-		if (cur != &One && cur != &Zero && cur->get_mark() != current_mark) {
+		if (cur != &One && cur != &Zero && cur->mark_ != current_mark) {
 			++collected;
-			auto tmp { cur->next() };
+			auto tmp { cur->next_ };
 			delete cur;
 			cur = tmp;
 			if (prev) {
-				prev->set_next(cur);	
+				prev->next_ = cur;	
 			} else { all_elements = cur; }
 		} else {
 			++kept;
 			prev = cur;
-			cur = cur->next();
+			cur = cur->next_;
 		}
 	}
-	return new Pair {
-		new Symbol { "collected" },
-		new Pair {
-			new Integer { collected },
-			new Pair {
-				new Symbol { "kept" },
-				new Pair {
-					new Integer { kept },
-					nullptr
-				}
-			}
-		}
-	};
+	return { collected, kept };
 }
 
+class Garbage_Collect_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override {
+			auto result { Element::garbage_collect() };
+			return new Pair {
+				new Symbol { "collected" },
+				new Pair {
+					new Integer { result.first },
+					new Pair {
+						new Symbol { "kept" },
+						new Pair {
+							new Integer { result.second },
+							nullptr
+						}
+					}
+				}
+			};
+		}
+};
+
 void process_stream(std::istream &in, std::ostream *out, bool prompt) {
+	active_frames.clear();
+	active_frames.push_back(&initial_frame);
+
 	if (prompt && out) { *out << "? "; }
 	ch = in.get();
 	if (ch == '#') {
