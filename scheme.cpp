@@ -30,7 +30,9 @@ void process_stream(std::istream &in, std::ostream *out, bool prompt) {
 int main(int argc, const char *argv[]) {
 	setup_primitives();
 	{
-		std::ifstream s { "scheme.scm" };
+		std::istringstream s { 
+			#include "scheme.scm.h"
+		};
 		process_stream(s, nullptr, false);
 	}
 
