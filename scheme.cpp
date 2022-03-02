@@ -22,7 +22,7 @@ void process_stream(std::istream &in, std::ostream *out, bool prompt) {
 	if (prompt && out) { *out << "? "; }
 	ch = in.get();
 	if (ch == '#') {
-		while (ch != EOF && ch >= ' ') { ch = in.get(); }
+		while (ch != EOF && ch != '\n') { ch = in.get(); }
 	}
 	for (;;) {
 		auto exp { read_expression(in) };

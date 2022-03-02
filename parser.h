@@ -69,6 +69,10 @@ Element *read_expression(std::istream &in) {
 			read_expression(in)
 		};
 	}
+	if (ch == ';') {
+		while (ch != EOF && ch != '\n') { ch = in.get(); }
+		return read_expression(in);
+	}
 	std::ostringstream result;
 	bool numeric { true };
 	unsigned value { 0 };
