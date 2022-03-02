@@ -14,7 +14,7 @@ class Element {
 		virtual void propagate_mark() { }
 			
 		void mark(Element *elm) {
-			if (elm) { mark(elm); }
+			if (elm) { elm->mark(); }
 		}
 	public:
 		Element(): next_ { all_elements}, mark_ { current_mark } {
@@ -47,7 +47,7 @@ class Error : public Element {
 		Element *data_;
 	protected:
 		void propagate_mark() override {
-			if (data_) { data_->mark(); }
+			mark(data_);
 		}
 	public:
 		Error(const std::string &raiser, const std::string &message, Element *data):
@@ -237,8 +237,7 @@ class Pair : public Element {
 		Element *rest_;
 	protected:
 		void propagate_mark() override {
-			if (head_) { head_->mark(); }
-			if (rest_) { rest_->mark(); }
+			mark(head_); mark(rest_);
 		}
 	public:
 		Pair(Element *head, Element *rest): head_ { head }, rest_ { rest } { }
@@ -532,9 +531,9 @@ class Frame : public Element {
 	protected:
 		void propagate_mark() override {
 			for (auto &v : elements_) {
-				v.second->mark();
+				mark(v.second);
 			}
-			if (next_) { next_->mark(); }
+			mark(next_);
 		}
 	public:
 		Frame(Frame *next): next_ { next } { }
@@ -579,9 +578,7 @@ class Procedure : public Element {
 		Frame *env_;
 	protected:
 		void propagate_mark() override {
-			if (args_) { args_->mark(); }
-			if (body_) { body_->mark(); }
-			if (env_) { env_->mark(); }
+			mark(args_); mark(body_); mark(env_);
 		}
 	public:
 		Procedure(Element *args, Element *body, Frame *env):
