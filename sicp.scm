@@ -1,4 +1,7 @@
 #!./scheme
+; examples from "Structure and Interpretation of Computer Programs"
+; defines are scoped into functions to avoid namespace pollution
+
 486
 (+ 137 349)
 (- 1000 334)
@@ -113,4 +116,17 @@
 	 (= n (smallest-divisor n)))
    (prime? 33)
    (prime? 11)))
-
+(define (even? n) (= (remainder n 2) 0))
+(define (square n) (* n n))
+(define (expmod base exp m)
+  (cond ((= exp 0) 1)
+		((even? exp)
+		 (remainder (square (expmod base (/ exp 2) m))
+					m))
+		(else
+		  (remainder (* base (expmod base (- exp 1) m))
+					 m))))
+(define (fermat-test n)
+  (define (try-it a)
+	(= (expmod a n n) a))
+  (try-it (+ 1 (random (- n 1)))))
