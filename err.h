@@ -1,3 +1,6 @@
+/**
+ * errors are special objects
+ */
 #include <string>
 
 class Error : public Element {

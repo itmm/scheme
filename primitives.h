@@ -1,3 +1,7 @@
+/**
+ * primitive functions
+ */
+
 class One_Primitive : public Primitive {
 	protected:
 		virtual Element *apply_one(Element *arg) = 0;

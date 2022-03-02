@@ -1,3 +1,7 @@
+/**
+ * implementation of the garbage collection
+ */
+
 Element *Element::all_elements { nullptr };
 bool Element::current_mark { true };
 

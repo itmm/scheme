@@ -1,3 +1,9 @@
+/**
+ * define base element for all Scheme-related types
+ * it can be written to an output stream
+ * and it is kept in a list to be garbage collected
+ */
+
 #include <iostream>
 
 class Element {

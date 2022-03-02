@@ -1,3 +1,9 @@
+/**
+ * evaluate expressions
+ * and call functions
+ * also special forms are handled
+ */
+
 class Primitive : public Element {
 	public:
 		virtual Element *apply(Element *args) = 0;

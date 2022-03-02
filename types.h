@@ -1,3 +1,9 @@
+/**
+ * basic types
+ * Integers can be as long as memory permits
+ * nullptr is treated as the empty pair
+ */
+
 template<typename VALUE_TYPE>
 class Value_Element : public Element {
 		VALUE_TYPE value_;

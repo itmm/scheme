@@ -1,3 +1,7 @@
+/**
+ * store Scheme objects in memory
+ */
+
 #include <map>
 
 class Frame : public Element {

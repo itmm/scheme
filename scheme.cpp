@@ -1,3 +1,11 @@
+/**
+ * simple Scheme interpreter with the following priorities
+ *
+ * 1. completness
+ * 2. small source code size
+ * 3. speed
+ */
+
 #include "element.h"
 #include "err.h"
 #include "types.h"

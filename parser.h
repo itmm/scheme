@@ -1,3 +1,7 @@
+/**
+ * convert a text stream to a Scheme expression
+ */
+
 static int ch { ' ' };
 
 Element *read_expression(std::istream &in);
