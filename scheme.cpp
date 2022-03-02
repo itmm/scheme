@@ -38,6 +38,27 @@ inline std::ostream &operator<<(std::ostream &out, Element *elm) {
 	}
 }
 
+class Error : public Element {
+		std::string raiser_;
+		std::string message_;
+		Element *data_;
+	protected:
+		void propagate_mark() override {
+			if (data_) { data_->mark(); }
+		}
+	public:
+		Error(const std::string &raiser, const std::string &message, Element *data):
+			raiser_ { raiser }, message_ { message }, data_ { data }
+		{ }
+		std::ostream &write(std::ostream &out) const override {
+			return out << "(#error " << raiser_ << ": " << message_;
+			if (data_) {
+				out << ": " << data_;
+			}
+			return out << ')';
+		}
+};
+
 template<typename VALUE_TYPE>
 class Value_Element : public Element {
 		VALUE_TYPE value_;
@@ -53,13 +74,12 @@ using Symbol = Value_Element<std::string>;
 using Float = Value_Element<double>;
 
 Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
-	std::cerr << fn << ": " << msg;
-	if (exp) { std::cerr << " (" << exp << ')'; }
-	std::cerr << '\n';
-	return nullptr;
+	auto er { new Error { fn, msg, exp } };
+	std::cerr << er << '\n';
+	return er;
 }
 
-#define ASSERT(CND, FN) if (! (CND)) { err((FN), "no " #CND); return nullptr; }
+#define ASSERT(CND, FN) if (! (CND)) { return err((FN), "no " #CND); }
 
 #include <vector>
 
@@ -118,18 +138,29 @@ class Negative_Integer : public Integer {
 		}
 };
 
-Integer *operator-(const Integer &a);
-Integer *operator-(const Integer &a, const Integer &b);
+Element *operator-(const Integer &a);
+Element *operator-(const Integer &a, const Integer &b);
 
-Integer *operator+(const Integer &a, const Integer &b) {
+Element *operator+(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
 	if (! a_neg && b_neg) {
-		return a - *(-b);
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_b, "int+");
+		return a - *neg_b;
 	} else if (a_neg && b_neg) {
-		return -*(*(-a) + *(-b));
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_a && neg_b, "int+");
+		auto neg_sum { dynamic_cast<Integer *>(*neg_a + *neg_b) };
+		ASSERT(neg_sum, "int+");
+		return -*neg_sum;
 	} else if (a_neg && ! b_neg) {
-		return -*(*(-a) - b);
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		ASSERT(neg_a, "int+");
+		auto neg_sum { dynamic_cast<Integer *>(*neg_a - b) };
+		ASSERT(neg_sum, "int+");
+		return -*neg_sum;
 	}
 
 	Integer::Digits digits;
@@ -148,7 +179,7 @@ Integer *operator+(const Integer &a, const Integer &b) {
 	return new Integer { std::move(digits) };
 }
 
-Integer *operator-(const Integer &a) {
+Element *operator-(const Integer &a) {
 	if (a.negative()) {
 		return new Integer { a.digits() };
 	} else {
@@ -156,15 +187,26 @@ Integer *operator-(const Integer &a) {
 	}
 }
 
-Integer *operator*(const Integer &a, const Integer &b) {
+Element *operator*(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
 	if (a_neg && b_neg) {
-		return *(-a) * *(-b);
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_a && neg_b, "int*");
+		return *neg_a * *neg_b;
 	} else if (a_neg && ! b_neg) {
-		return -*(*(-a) * b);
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		ASSERT(neg_a, "int*");
+		auto prod { dynamic_cast<Integer *>(*neg_a * b) };
+		ASSERT(prod, "int*");
+		return -*prod;
 	} else if (! a_neg && b_neg) {
-		return -*(a * *(-b));
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_b, "int*");
+		auto prod { dynamic_cast<Integer *>(a * *neg_b) };
+		ASSERT(prod, "int*");
+		return -*prod;
 	}
 	Integer::Digits digits;
 	auto a_i { a.digits().begin() };
@@ -214,13 +256,19 @@ Element *to_bool(bool cond) {
 		dynamic_cast<Element *>(&False);
 }
 
+bool is_err(Element *element) {
+	return ! element || dynamic_cast<Error *>(element);
+}
+
+bool is_good(Element *element) { return ! is_err(element); }
+
 bool is_true(Element *value) {
-	if (! value) { err("is_true", "no value"); }
-	return value && value != &Null;
+	if (is_err(value)) { err("is_true", "no value"); }
+	return is_good(value) && value != &Null;
 }
 
 bool is_false(Element *value) {
-	if (! value) { err("is_false", "no value"); }
+	if (is_err(value)) { err("is_false", "no value"); }
 	return value == &Null;
 }
 
@@ -228,7 +276,10 @@ Element *operator<(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
 	if (a_neg && b_neg) {
-		return *(-b) < *(-a);
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_a && neg_b, "<");
+		return *neg_b < *neg_a;
 	} else if (a_neg && ! b_neg) {
 		return to_bool(! a.zero() || ! b.zero());
 	} else if (! a_neg && b_neg) {
@@ -258,25 +309,52 @@ static Integer *half(const Integer &num) {
 	return new Integer { std::move(result) };
 }
 
-Integer *operator/(const Integer &a, const Integer &b) {
+Element *operator/(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
 	if (a_neg && b_neg) {
-		return *(-a) / *(-b);
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_a && neg_b, "int/");
+		return *neg_a / *neg_b;
 	} else if (a_neg && ! b_neg) {
-		return -*(*(-a) / b);
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		ASSERT(neg_a, "int/");
+		auto neg_div { dynamic_cast<Integer *>(*neg_a / b) };
+		ASSERT(neg_div, "int/");
+		return -*neg_div;
 	} else if (! a_neg && b_neg) {
-		return -*(a / *(-b));
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_b, "int/");
+		auto neg_div { dynamic_cast<Integer *>(a / *neg_b) };
+		ASSERT(neg_div, "int/");
+		return -*neg_div;
 	}
 	ASSERT(! b.zero(), "int/");
 	if (is_true(a < b)) { return &Zero; }
 	Integer *min { &One };
-	Integer *max { b * b };
+	auto max { dynamic_cast<Integer *>(b * b) };
+	ASSERT(max, "int/");
 	Integer *two { new Integer { 2 } };
-	while (is_true(*(*max * b) < a)) { max = *max * *max; }
-	while (is_true(One < *(*max - *min))) {
-		Integer *mid { half(*(*max + *min)) };
-		Integer *prod { *mid * b };
+
+	for (;;) {
+		auto prod { dynamic_cast<Integer *>(*max * b) };
+		ASSERT(prod, "int/");
+		if (is_false(*prod < a)) { break; }
+		max = dynamic_cast<Integer *>(*max * *max);
+		ASSERT(max, "int/");
+	}
+
+	for (;;) {
+		auto diff { dynamic_cast<Integer *>(*max - *min) };
+		ASSERT(diff, "int/");
+		if (is_false(One < *diff)) { break; }
+		auto sum { dynamic_cast<Integer *>(*max + *min) };
+		ASSERT(sum, "int/");
+		auto mid { half(*sum) };
+		ASSERT(mid, "int/");
+		auto prod { dynamic_cast<Integer *>(*mid * b) };
+		ASSERT(prod, "int/");
 		if (is_true(*prod < a)) { min = mid; }
 		else if (is_true(a < *prod)) { max = mid; }
 		else { return mid; }
@@ -284,18 +362,30 @@ Integer *operator/(const Integer &a, const Integer &b) {
 	return min;
 }
 
-Integer *operator-(const Integer &a, const Integer &b) {
+Element *operator-(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
 	if (! a_neg && b_neg) {
-		return a + *(-b);
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_b, "int-");
+		return a + *neg_b;
 	} else if (a_neg && b_neg) {
-		return -*(*(-a) - *(-b));
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		auto neg_b { dynamic_cast<Integer *>(-b) };
+		ASSERT(neg_a && neg_b, "int-");
+		auto sum { dynamic_cast<Integer *>(*neg_a - *neg_b) };
+		ASSERT(sum, "int-");
+		return -*sum;
 	} else if (a_neg && ! b_neg) {
-		return -*(*(-a) + b);
+		auto neg_a { dynamic_cast<Integer *>(-a) };
+		ASSERT(neg_a, "int-");
+		auto sum { dynamic_cast<Integer*>(*neg_a + b) };
+		ASSERT(sum, "int-");
+		return -*sum;
 	}
 	if (is_true(a < b)) {
-		auto diff { b - a };
+		auto diff { dynamic_cast<Integer *>(b - a) };
+		ASSERT(diff, "int-");
 		return new Negative_Integer { diff->digits() };
 	}
 
@@ -362,10 +452,7 @@ void eat_space(std::istream &in) {
 
 Element *read_list(std::istream &in) {
 	eat_space(in);
-	if (ch == EOF) {
-		std::cerr << "incomplete list\n";
-		return nullptr;
-	}
+	if (ch == EOF) { return err("read_list", "incomplete_list"); }
 	if (ch == ')') {
 		ch = in.get();
 		return &Null;
@@ -524,7 +611,7 @@ std::ostream &Procedure::write(std::ostream &out) const {
 }
 
 bool is_null(Element *element) {
-	if (! element) { err("is_null", "no argument"); }
+	if (is_err(element)) { err("is_null", "no argument"); }
 	return element == &Null;
 }
 
@@ -533,7 +620,7 @@ Element *Procedure::apply(Element *arg_values) {
 
 	Element *cur { args_ };
 	auto cur_pair { dynamic_cast<Pair *>(cur) };
-	for (; cur_pair && cur_pair != &Null; cur = cdr(cur),
+	for (; is_good(cur_pair) && cur_pair != &Null; cur = cdr(cur),
 		cur_pair = dynamic_cast<Pair *>(cur)
 	) {
 		auto sym { dynamic_cast<Symbol *>(car(cur)) };
@@ -543,7 +630,7 @@ Element *Procedure::apply(Element *arg_values) {
 		new_env->insert(sym->value(), value);
 		arg_values = cdr(arg_values);
 	}
-	ASSERT(cur, "procedure");
+	ASSERT(is_good(cur), "procedure");
 	if (cur != &Null) {
 		auto sym { dynamic_cast<Symbol *>(cur) };
 		ASSERT(sym, "procedure");
@@ -554,7 +641,7 @@ Element *Procedure::apply(Element *arg_values) {
 	cur = body_;
 	cur_pair = dynamic_cast<Pair *>(cur);
 	Element *value = &Null;
-	for (; cur_pair && cur_pair != &Null; cur = cdr(cur),
+	for (; is_good(cur_pair) && cur_pair != &Null; cur = cdr(cur),
 		cur_pair = dynamic_cast<Pair *>(cur)
 	) {
 		Element *statement { car(cur_pair) };
@@ -574,14 +661,14 @@ Element *apply(Element *op, Element *operands) {
 	return err("apply", "unknown operation", op);
 }
 
-Pair *eval_list(Pair *exp, Frame *env) {
-	if (! exp || exp == &Null) { return exp; }
-	auto head { eval(exp->head(), env) };
-	auto rest { dynamic_cast<Pair *>(exp->rest()) };
+Element *eval_list(Element *exp, Frame *env) {
+	if (is_err(exp) || exp == &Null) { return exp; }
+	auto head { eval(car(exp), env) };
+	auto rest { dynamic_cast<Pair *>(cdr(exp)) };
 	if (rest) {
 		return new Pair { head, eval_list(rest, env) };
 	} else {
-		return new Pair { head, eval(exp->rest(), env) };
+		return new Pair { head, eval(cdr(exp), env) };
 	}
 }
 
@@ -598,7 +685,7 @@ Element *cadr(Element *lst) {
 	return car(cdr(lst));
 }
 
-inline Symbol *define_key(Pair *lst) {
+inline Element *define_key(Pair *lst) {
 	auto first { cadr(lst) };
 	auto sym { dynamic_cast<Symbol *>(first) };
 	if (sym) { return sym; }
@@ -669,7 +756,7 @@ inline bool is_cond_special(Pair *lst) {
 }
 
 Element *build_cond(Element *lst) {
-	if (! lst || lst == &Null) { return lst; }
+	if (is_err(lst) || lst == &Null) { return lst; }
 	auto expr { car(lst) };
 	auto cond { car(expr) };
 	auto cons { cdr(expr) };
@@ -710,7 +797,7 @@ inline bool is_quote_special(Pair *lst) {
 }
 
 Element *eval(Element *exp, Frame *env) {
-	if (! exp || exp == &Null) { return exp; }
+	if (is_err(exp) || exp == &Null) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
 	if (int_value) { return int_value; }
 	auto float_value { dynamic_cast<Float *>(exp) };
@@ -723,21 +810,21 @@ Element *eval(Element *exp, Frame *env) {
 	auto lst_value { dynamic_cast<Pair *>(exp) };
 	if (lst_value) {
 		if (is_define_special(lst_value)) {
-			auto key { define_key(lst_value) };
+			auto key { dynamic_cast<Symbol *>(define_key(lst_value)) };
 			auto value { define_value(lst_value, env) };
-			ASSERT(key && value, "define");
+			ASSERT(key && is_good(value), "define");
 			env->insert(key->value(), value);
 			return value;
 		}
 		if (is_lambda_special(lst_value)) {
 			auto args { lambda_args(lst_value) };
 			auto body { lambda_body(lst_value) };
-			ASSERT(args && body, "lambda");
+			ASSERT(is_good(args) && is_good(body), "lambda");
 			return new Procedure(args, body, env);
 		}
 		if (is_if_special(lst_value)) {
 			auto condition { eval(if_condition(lst_value), env) };
-			ASSERT(condition, "if");
+			ASSERT(is_good(condition), "if");
 			if (is_true(condition)) {
 				return eval(if_consequence(lst_value), env);
 			} else {
@@ -746,24 +833,24 @@ Element *eval(Element *exp, Frame *env) {
 		}
 		if (is_cond_special(lst_value)) {
 			auto expr { build_cond(cdr(lst_value)) };
-			ASSERT(expr, "cond");
+			ASSERT(is_good(expr), "cond");
 			return eval(expr, env);
 		}
 		if (is_begin_special(lst_value)) {
 			Element *result;
 			auto cur { cdr(lst_value) };
-			for (; cur && cur != &Null; cur = cdr(cur)) {
+			for (; is_good(cur) && cur != &Null; cur = cdr(cur)) {
 				result = eval(car(cur), env);
-				ASSERT(result, "begin");
+				ASSERT(is_good(result), "begin");
 			}
 			return result;
 		}
 		if (is_and_special(lst_value)) {
 			auto cur { cdr(lst_value) };
 			Element *result { &True };
-			for (; cur && cur != &Null; cur = cdr(cur)) {
+			for (; is_good(cur) && cur != &Null; cur = cdr(cur)) {
 				result = eval(car(cur), env);
-				ASSERT(result, "and");
+				ASSERT(is_good(result), "and");
 				if (is_false(result)) { break; }
 			}
 			return result;
@@ -771,9 +858,9 @@ Element *eval(Element *exp, Frame *env) {
 		if (is_or_special(lst_value)) {
 			auto cur { cdr(lst_value) };
 			Element *result { &False };
-			for (; cur && cur != &Null; cur = cdr(cur)) {
+			for (; is_good(cur) && cur != &Null; cur = cdr(cur)) {
 				result = eval(car(cur), env);
-				ASSERT(result, "or");
+				ASSERT(is_good(result), "or");
 				if (is_true(result)) { break; }
 			}
 			return result;
@@ -782,7 +869,7 @@ Element *eval(Element *exp, Frame *env) {
 			return cdr(lst_value);
 		}
 		auto lst { eval_list(lst_value, env) };
-		return apply(lst->head(), lst->rest());
+		return apply(car(lst), cdr(lst));
 	}
 	ASSERT(false, "eval");
 }
@@ -834,7 +921,7 @@ class Null_Primitive: public Primitive {
 	public:
 		Element *apply(Element *args) override {
 			Element *obj { car(args) };
-			ASSERT(obj, "null?");
+			ASSERT(is_good(obj), "null?");
 			return to_bool(is_null(obj));
 		}
 };
@@ -844,7 +931,7 @@ class Apply_Primitive: public Primitive {
 		Element *apply(Element *args) override {
 			Element *fn { car(args) };
 			Element *fn_args { cadr(args) };
-			ASSERT(fn && fn_args && is_null(cddr(args)), "apply");
+			ASSERT(is_good(fn) && is_good(fn_args) && is_null(cddr(args)), "apply");
 			return ::apply(fn, fn_args);
 		}
 };
@@ -861,7 +948,7 @@ class Numeric_Primitive : public Primitive {
 Element *Numeric_Primitive::apply(Element *args) {
 	Element *a { car(args) };
 	Element *b { cadr(args) };
-	ASSERT(a && b && is_null(cddr(args)), "numeric");
+	ASSERT(is_good(a) && is_good(b) && is_null(cddr(args)), "numeric");
 	auto a_i { dynamic_cast<Integer *>(a) };
 	auto b_i { dynamic_cast<Integer *>(b) };
 	if (a_i && b_i) { return do_int(*a_i, *b_i); }
@@ -952,7 +1039,7 @@ Element *Garbage_Collect_Primitive::apply(Element *args) {
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
-		if (cur != &Null && cur != &True && cur != &Zero && cur->get_mark() != current_mark) {
+		if (cur != &Null && cur != &One && cur != &Zero && cur->get_mark() != current_mark) {
 			++collected;
 			auto tmp { cur->next() };
 			delete cur;
