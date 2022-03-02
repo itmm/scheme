@@ -188,20 +188,6 @@ Integer *operator*(const Integer &a, const Integer &b) {
 	return new Integer { std::move(digits) };
 }
 
-Integer *operator/(const Integer &a, const Integer &b) {
-	auto a_neg { a.negative() };
-	auto b_neg { b.negative() };
-	if (a_neg && b_neg) {
-		return *(-a) / *(-b);
-	} else if (a_neg && ! b_neg) {
-		return -*(*(-a) / b);
-	} else if (! a_neg && b_neg) {
-		return -*(a / *(-b));
-	}
-	ASSERT(! b.zero(), "int/");
-	return new Integer(a.int_value() / b.int_value());
-}
-
 class Pair : public Element {
 		Element *head_;
 		Element *rest_;
@@ -257,6 +243,21 @@ Element *operator<(const Integer &a, const Integer &b) {
 		if (*a_i > *b_i) { return to_bool(false); }
 	}
 	return to_bool(false);
+}
+
+Integer *operator/(const Integer &a, const Integer &b) {
+	auto a_neg { a.negative() };
+	auto b_neg { b.negative() };
+	if (a_neg && b_neg) {
+		return *(-a) / *(-b);
+	} else if (a_neg && ! b_neg) {
+		return -*(*(-a) / b);
+	} else if (! a_neg && b_neg) {
+		return -*(a / *(-b));
+	}
+	ASSERT(! b.zero(), "int/");
+	if (is_true(a < b)) { return Zero; }
+	return new Integer(a.int_value() / b.int_value());
 }
 
 Integer *operator-(const Integer &a, const Integer &b) {
