@@ -50,7 +50,10 @@ class Error : public Element {
 			mark(data_);
 		}
 	public:
-		Error(const std::string &raiser, const std::string &message, Element *data):
+		Error(
+			const std::string &raiser, const std::string &message,
+			Element *data
+		):
 			raiser_ { raiser }, message_ { message }, data_ { data }
 		{ }
 		std::ostream &write(std::ostream &out) const override {
@@ -91,12 +94,6 @@ class Integer : public Element {
 		using Digits = std::vector<char>;
 	private:
 		Digits digits_;
-		void push_digits(unsigned value) {
-			if (value) {
-				digits_.push_back(value % 10);
-				push_digits(value / 10);
-			}
-		}
 		void normalize() {
 			while (! digits_.empty() && digits_.back() == 0) {
 				digits_.pop_back();
@@ -104,7 +101,10 @@ class Integer : public Element {
 		}
 	public:
 		Integer(unsigned value) {
-			push_digits(value);
+			while (value) {
+				digits_.push_back(value % 10);
+				value /= 10;
+			}
 		}
 		Integer(const Digits &digits): digits_ { digits } {
 			normalize();
@@ -120,7 +120,7 @@ class Integer : public Element {
 			}
 			return result;
 		}
-		bool zero() const { return digits_.empty(); }
+		bool is_zero() const { return digits_.empty(); }
 		std::ostream &write(std::ostream &out) const override {
 			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
 				out << static_cast<char>('0' + *i);
@@ -270,7 +270,7 @@ bool is_false(Element *value) {
 	return ! value;
 }
 
-Element *operator<(const Integer &a, const Integer &b) {
+bool operator<(const Integer &a, const Integer &b) {
 	auto a_neg { a.negative() };
 	auto b_neg { b.negative() };
 	if (a_neg && b_neg) {
@@ -279,20 +279,20 @@ Element *operator<(const Integer &a, const Integer &b) {
 		ASSERT(neg_a && neg_b, "<");
 		return *neg_b < *neg_a;
 	} else if (a_neg && ! b_neg) {
-		return to_bool(! a.zero() || ! b.zero());
+		return ! a.is_zero() || ! b.is_zero();
 	} else if (! a_neg && b_neg) {
-		return to_bool(false);
+		return false;
 	}
-	if (a.digits().size() > b.digits().size()) { return to_bool(false); }
-	if (a.digits().size() < b.digits().size()) { return to_bool(true); }
+	if (a.digits().size() > b.digits().size()) { return false; }
+	if (a.digits().size() < b.digits().size()) { return true; }
 
 	auto a_i { a.digits().rbegin() };
 	auto b_i { b.digits().rbegin() };
 	for (; a_i != a.digits().rend(); ++a_i, ++b_i) {
-		if (*a_i < *b_i) { return to_bool(true); }
-		if (*a_i > *b_i) { return to_bool(false); }
+		if (*a_i < *b_i) { return true; }
+		if (*a_i > *b_i) { return false; }
 	}
-	return to_bool(false);
+	return false;
 }
 
 static Integer *half(const Integer &num) {
@@ -328,8 +328,8 @@ Element *operator/(const Integer &a, const Integer &b) {
 		ASSERT(neg_div, "int/");
 		return -*neg_div;
 	}
-	ASSERT(! b.zero(), "int/");
-	if (is_true(a < b)) { return &Zero; }
+	ASSERT(! b.is_zero(), "int/");
+	if (a < b) { return &Zero; }
 	Integer *min { &One };
 	auto max { dynamic_cast<Integer *>(b * b) };
 	ASSERT(max, "int/");
@@ -338,7 +338,7 @@ Element *operator/(const Integer &a, const Integer &b) {
 	for (;;) {
 		auto prod { dynamic_cast<Integer *>(*max * b) };
 		ASSERT(prod, "int/");
-		if (is_false(*prod < a)) { break; }
+		if (! (*prod < a)) { break; }
 		max = dynamic_cast<Integer *>(*max * *max);
 		ASSERT(max, "int/");
 	}
@@ -346,15 +346,15 @@ Element *operator/(const Integer &a, const Integer &b) {
 	for (;;) {
 		auto diff { dynamic_cast<Integer *>(*max - *min) };
 		ASSERT(diff, "int/");
-		if (is_false(One < *diff)) { break; }
+		if (! (One < *diff)) { break; }
 		auto sum { dynamic_cast<Integer *>(*max + *min) };
 		ASSERT(sum, "int/");
 		auto mid { half(*sum) };
 		ASSERT(mid, "int/");
 		auto prod { dynamic_cast<Integer *>(*mid * b) };
 		ASSERT(prod, "int/");
-		if (is_true(*prod < a)) { min = mid; }
-		else if (is_true(a < *prod)) { max = mid; }
+		if (*prod < a) { min = mid; }
+		else if (a < *prod) { max = mid; }
 		else { return mid; }
 	}
 	return min;
@@ -381,7 +381,7 @@ Element *operator-(const Integer &a, const Integer &b) {
 		ASSERT(sum, "int-");
 		return -*sum;
 	}
-	if (is_true(a < b)) {
+	if (a < b) {
 		auto diff { dynamic_cast<Integer *>(b - a) };
 		ASSERT(diff, "int-");
 		return new Negative_Integer { diff->digits() };
@@ -402,19 +402,19 @@ Element *operator-(const Integer &a, const Integer &b) {
 	return new Integer { std::move(digits) };
 }
 
-Element *operator==(const Integer &a, const Integer &b) {
+bool operator==(const Integer &a, const Integer &b) {
 	if (a.negative() != b.negative()) {
-		return to_bool(a.zero() && b.zero());
+		return a.is_zero() && b.is_zero();
 	}
 	if (a.digits().size() != b.digits().size()) {
-		return to_bool(false);
+		return false;
 	}
 	auto a_i { a.digits().begin() };
 	auto b_i { b.digits().begin() };
 	for (; a_i != a.digits().end(); ++a_i, ++b_i) {
-		if (*a_i != *b_i) { return to_bool(false); }
+		if (*a_i != *b_i) { return false; }
 	}
-	return to_bool(true);
+	return true;
 }
 
 std::ostream &Pair::write(std::ostream &out) const {
@@ -450,7 +450,9 @@ void eat_space(std::istream &in) {
 
 Element *read_list(std::istream &in) {
 	eat_space(in);
-	if (ch == EOF) { return err("read_list", "incomplete_list"); }
+	if (ch == EOF) {
+		return err("read_list", "incomplete_list");
+	}
 	if (ch == ')') {
 		ch = in.get();
 		return nullptr;
@@ -619,7 +621,7 @@ bool is_null(Element *element) {
 }
 
 bool is_pair(Element *elm) {
-	return !elm || dynamic_cast<Pair *>(elm);
+	return dynamic_cast<Pair *>(elm);
 }
 
 Symbol *assert_sym(Element *elm) {
@@ -633,7 +635,7 @@ Element *Procedure::apply(Element *arg_values) {
 
 	Element *cur { args_ };
 	ASSERT(is_good(cur), "procedure");
-	for (; is_pair(cur) && cur; cur = cdr(cur)) {
+	for (; is_pair(cur); cur = cdr(cur)) {
 		auto sym { assert_sym(car(cur)) };
 		ASSERT(sym, "procedure");
 		auto value { car(arg_values) };
@@ -651,7 +653,7 @@ Element *Procedure::apply(Element *arg_values) {
 
 	cur = body_;
 	Element *value { nullptr };
-	for (; is_pair(cur) && cur; cur = cdr(cur)) {
+	for (; is_pair(cur); cur = cdr(cur)) {
 		Element *statement { car(cur) };
 		ASSERT(is_good(statement), "procedure");
 		value = eval(statement, new_env);
@@ -880,25 +882,27 @@ Element *eval(Element *exp, Frame *env) {
 	ASSERT(false, "eval");
 }
 
-class Car_Primitive : public Primitive {
+class One_Primitive : public Primitive {
+	protected:
+		virtual Element *apply_one(Element *arg) = 0;
 	public:
-		Element *apply(Element *args) override;
+		Element *apply(Element *args) override {
+			ASSERT(is_pair(args), "one primitive");
+			ASSERT(is_null(cdr(args)), "one primitive");
+			return apply_one(car(args));
+		}
 };
 
-Element *Car_Primitive::apply(Element *args) {
-	ASSERT(is_null(cdr(args)), "car");
-	return car(car(args));
-}
-
-class Cdr_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
+class Car_Primitive : public One_Primitive {
+	protected:
+		Element *apply_one(Element *arg) override { return car(arg); }
 };
 
-Element *Cdr_Primitive::apply(Element *args) {
-	ASSERT(is_null(cdr(args)), "cdr");
-	return cdr(car(args));
-}
+
+class Cdr_Primitive : public One_Primitive {
+	protected:
+		Element *apply_one(Element *arg) override { return cdr(arg); }
+};
 
 class List_Primitive : public Primitive {
 	public:
@@ -909,52 +913,48 @@ Element *List_Primitive::apply(Element *args) {
 	return args;
 }
 
-class Cons_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-};
-
-Element *Cons_Primitive::apply(Element *args) {
-	Element *first { car(args) };
-	Element *nxt { cdr(args) };
-	Element *second { car(nxt) };
-	nxt = cdr(nxt);
-	ASSERT(is_good(first) && is_good(second) && is_null(nxt), "cons");
-	return new Pair { first, second };
-}
-
-class Null_Primitive: public Primitive {
-	public:
-		Element *apply(Element *args) override {
-			Element *obj { car(args) };
-			ASSERT(is_good(obj), "null?");
-			return to_bool(is_null(obj));
-		}
-};
-
-class Apply_Primitive: public Primitive {
-	public:
-		Element *apply(Element *args) override {
-			Element *fn { car(args) };
-			Element *fn_args { cadr(args) };
-			ASSERT(is_good(fn) && is_good(fn_args) && is_null(cddr(args)), "apply");
-			return ::apply(fn, fn_args);
-		}
-};
-
-class Numeric_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-	
+class Two_Primitive : public Primitive {
 	protected:
+		virtual Element *apply_two(Element *first, Element *second) = 0;
+	public:
+		Element *apply(Element *args) override {
+			ASSERT(is_pair(args), "two primitive");
+			auto nxt { cdr(args) };
+			ASSERT(is_pair(nxt), "two primitive");
+			ASSERT(is_null(cdr(nxt)), "two primitive");
+			return apply_two(car(args), car(nxt));
+		}
+};
+
+class Cons_Primitive : public Two_Primitive {
+	protected:
+		Element *apply_two(Element *first, Element *second) override {
+			return new Pair { first, second };
+		}
+};
+
+class Null_Primitive: public One_Primitive {
+	protected:
+		Element *apply_one(Element *arg) override {
+			return to_bool(is_null(arg));
+		}
+};
+
+class Apply_Primitive: public Two_Primitive {
+	protected:
+		Element *apply_two(Element *first, Element *second) override {
+			return ::apply(first, second);
+		}
+};
+
+class Numeric_Primitive : public Two_Primitive {
+	protected:
+		Element *apply_two(Element *a, Element *b) override;
 		virtual Element *do_int(const Integer &a, const Integer &b) = 0;
 		virtual Element *do_float(double a, double b) = 0;
 };
 
-Element *Numeric_Primitive::apply(Element *args) {
-	Element *a { car(args) };
-	Element *b { cadr(args) };
-	ASSERT(is_good(a) && is_good(b) && is_null(cddr(args)), "numeric");
+Element *Numeric_Primitive::apply_two(Element *a, Element *b) {
 	auto a_i { dynamic_cast<Integer *>(a) };
 	auto b_i { dynamic_cast<Integer *>(b) };
 	if (a_i && b_i) { return do_int(*a_i, *b_i); }
@@ -967,7 +967,7 @@ Element *Numeric_Primitive::apply(Element *args) {
 			b_f ? b_f->value() : b_i->float_value()
 		);
 	}
-	return err("numeric", "invalid arguments", args);
+	return err("numeric", "invalid arguments", new Pair { a, b });
 }
 
 class Add_Primitive : public Numeric_Primitive {
@@ -1013,7 +1013,7 @@ class Div_Primitive : public Numeric_Primitive {
 class Less_Primitive : public Numeric_Primitive {
 	protected:
 		Element *do_int(const Integer &a, const Integer &b) override {
-			return a < b;
+			return to_bool(a < b);
 		}
 		Element *do_float(double a, double b) override {
 			return to_bool(a < b);
@@ -1023,7 +1023,7 @@ class Less_Primitive : public Numeric_Primitive {
 class Equal_Primitive : public Numeric_Primitive {
 	protected:
 		Element *do_int(const Integer &a, const Integer &b) override {
-			return a == b;
+			return to_bool(a == b);
 		}
 		Element *do_float(double a, double b) override {
 			return to_bool(a == b);
