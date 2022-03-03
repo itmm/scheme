@@ -215,6 +215,37 @@ inline bool is_quote_special(Pair *lst) {
 	return is_tagged_list(lst, "quote");
 }
 
+inline bool is_let_special(Pair *lst) {
+	return is_tagged_list(lst, "let");
+}
+
+Element *build_let_args(Element *arg_vals, Element *args) {
+	if (is_null(arg_vals)) { return args; }
+	args = build_let_args(cdr(arg_vals), args);
+	return new Pair { car(car(arg_vals)), args };
+}
+
+Element *build_let_vals(Element *arg_vals, Element *vals) {
+	if (is_null(arg_vals)) { return vals; }
+	vals = build_let_vals(cdr(arg_vals), vals);
+	return new Pair { cadr(car(arg_vals)), vals };
+}
+
+Element *build_let(Element *lst) {
+	auto arg_vals { cadr(lst) };
+	auto block { cddr(lst) };
+	ASSERT(is_good(arg_vals) && is_good(block), "let");
+	auto args { build_let_args(arg_vals, nullptr) };
+	auto vals { build_let_vals(arg_vals, nullptr) };
+	return new Pair {
+		new Pair {
+			new Symbol { "lambda" },
+			new Pair { args, block }
+		},
+		vals
+	};
+}
+
 Element *eval(Element *exp, Frame *env) {
 	if (is_err(exp) || ! exp) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
@@ -286,6 +317,11 @@ Element *eval(Element *exp, Frame *env) {
 		}
 		if (is_quote_special(lst_value)) {
 			return cdr(lst_value);
+		}
+		if (is_let_special(lst_value)) {
+			auto expr { build_let(lst_value) };
+			ASSERT(is_good(expr), "let");
+			return eval(expr, env);
 		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(car(lst), cdr(lst));
