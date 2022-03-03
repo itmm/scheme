@@ -126,6 +126,10 @@
 		(else
 		  (remainder (* base (expmod base (- exp 1) m))
 					 m))))
+(define random (let ((seed 1234) (a 1664525) (c 1013904223) (m (* 65536 65536)))
+  (lambda (max) 
+    (set! seed (remainder (+ (* a seed) c) m))
+    (remainder seed max))))
 (define (fermat-test n)
   (define (try-it a)
 	(= (expmod a n n) a))

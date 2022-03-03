@@ -53,6 +53,7 @@ class Integer : public Element {
 		}
 		bool is_zero() const { return digits_.empty(); }
 		std::ostream &write(std::ostream &out) const override {
+			if (digits_.empty()) { return out << '0'; }
 			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
 				out << static_cast<char>('0' + *i);
 			}
