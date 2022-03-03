@@ -19,6 +19,7 @@ class Frame : public Element {
 		void insert(const std::string &key, Element *value);
 		bool has(const std::string &key) const;
 		Element *get(const std::string &key) const;
+		Element *update(Symbol *key, Element *value);
 		std::ostream &write(std::ostream &out) const override {
 			return out << "#frame";
 		}
@@ -38,4 +39,15 @@ Element *Frame::get(const std::string &key) const {
 	auto it { elements_.find(key) };
 	return it != elements_.end() ? it->second :
 		next_ ? next_->get(key) : nullptr;
+}
+
+Element *Frame::update(Symbol *key, Element *value) {
+	ASSERT(key, "update");
+	auto it { elements_.find(key->value()) };
+	if (it != elements_.end()) {
+		it->second = value;
+		return value;
+	} else if (next_) {
+		return next_->update(key, value);
+	} else return err("update", "not found", key);
 }

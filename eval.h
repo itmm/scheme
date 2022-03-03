@@ -246,6 +246,18 @@ Element *build_let(Element *lst) {
 	};
 }
 
+bool is_set_special(Pair *lst) {
+	return is_tagged_list(lst, "set!");
+}
+
+Element *set_var(Element *lst) { return cadr(lst); }
+Element *set_value(Element *lst) { return caddr(lst); }
+
+bool is_valid_set(Pair *lst) {
+	return assert_sym(set_var(lst)) && is_good(set_value(lst)) &&
+		is_null(cdddr(lst));
+}
+
 Element *eval(Element *exp, Frame *env) {
 	if (is_err(exp) || ! exp) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
@@ -322,6 +334,13 @@ Element *eval(Element *exp, Frame *env) {
 			auto expr { build_let(lst_value) };
 			ASSERT(is_good(expr), "let");
 			return eval(expr, env);
+		}
+		if (is_set_special(lst_value)) {
+			ASSERT(is_valid_set(lst_value), "set!");
+			auto sym { dynamic_cast<Symbol *>(set_var(lst_value)) };
+			auto val { eval(set_value(lst_value), env) };
+			ASSERT(is_good(val), "set!");
+			return env->update(sym, val);
 		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(car(lst), cdr(lst));
