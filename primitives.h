@@ -155,11 +155,11 @@ class Garbage_Collect_Primitive : public Primitive {
 		Element *apply(Element *args) override {
 			auto result { Element::garbage_collect() };
 			return new Pair {
-				new Symbol { "collected" },
+				Symbol::get("collected"),
 				new Pair {
 					new Integer { result.first },
 					new Pair {
-						new Symbol { "kept" },
+						Symbol::get("kept"),
 						new Pair {
 							new Integer { result.second },
 							nullptr
@@ -167,6 +167,13 @@ class Garbage_Collect_Primitive : public Primitive {
 					}
 				}
 			};
+		}
+};
+
+class Eq_Primitive : public Two_Primitive {
+	protected:
+		Element *apply_two(Element *first, Element *second) override {
+			return to_bool(first == second);
 		}
 };
 
@@ -186,4 +193,5 @@ void setup_primitives() {
 	initial_frame.insert("null?", new Null_Primitive());
 	initial_frame.insert("apply", new Apply_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
+	initial_frame.insert("eq?", new Eq_Primitive());
 }

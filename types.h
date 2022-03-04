@@ -8,15 +8,41 @@ template<typename VALUE_TYPE>
 class Value_Element : public Element {
 		VALUE_TYPE value_;
 	public:
-		Value_Element(VALUE_TYPE value): value_ { value } { }
-		VALUE_TYPE value() const { return value_; }
+		Value_Element(const VALUE_TYPE &value): value_ { value } { }
+		const VALUE_TYPE &value() const { return value_; }
 		std::ostream &write(std::ostream &out) const override {
 			return out << value_;
 		}
 };
 
-using Symbol = Value_Element<std::string>;
 using Float = Value_Element<double>;
+
+#include <map>
+
+class Symbol : public Element {
+		static std::map<std::string, Symbol *>symbols_;
+		std::string value_;
+		Symbol(const std::string &value): value_ { value } { }
+	public:
+		~Symbol() {
+			auto it { symbols_.find(value_) };
+			if (it != symbols_.end()) { symbols_.erase(it); }
+		}
+
+		static Symbol *get(const std::string &value) {
+			auto it { symbols_.find(value) };
+			if (it != symbols_.end()) { return it->second; }
+			auto sym { new Symbol { value } };
+			symbols_[value] = sym;
+			return sym;
+		}
+		const std::string &value() const { return value_; }
+		std::ostream &write(std::ostream &out) const override {
+			return out << value_;
+		}
+};
+
+std::map<std::string, Symbol *> Symbol::symbols_;
 
 #include <vector>
 

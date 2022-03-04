@@ -185,14 +185,14 @@ Element *build_cond(Element *lst) {
 		if (cdr(lst)) {
 			return err("cond", "else not in last case");
 		}
-		return new Pair { new Symbol { "begin" }, cons };
+		return new Pair { Symbol::get("begin"), cons };
 	}
 	return new Pair {
-		new Symbol { "if" },
+		Symbol::get("if"),
 		new Pair {
 			cond,
 			new Pair {
-				new Pair { new Symbol { "begin" }, cons },
+				new Pair { Symbol::get("begin"), cons },
 				new Pair { build_cond(cdr(lst)), nullptr }
 			}
 		}
@@ -239,7 +239,7 @@ Element *build_let(Element *lst) {
 	auto vals { build_let_vals(arg_vals, nullptr) };
 	return new Pair {
 		new Pair {
-			new Symbol { "lambda" },
+			Symbol::get("lambda"),
 			new Pair { args, block }
 		},
 		vals

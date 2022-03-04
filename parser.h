@@ -65,7 +65,7 @@ Element *read_expression(std::istream &in) {
 	if (ch == '\'') {
 		ch = in.get();
 		return new Pair {
-			new Symbol { "quote" },
+			Symbol::get("quote"),
 			read_expression(in)
 		};
 	}
@@ -90,5 +90,5 @@ Element *read_expression(std::istream &in) {
 	if (is_float(result.str())) {
 		return new Float { float_value(result.str()) };
 	}
-	return new Symbol { result.str() };
+	return Symbol::get(result.str());
 }

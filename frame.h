@@ -2,8 +2,6 @@
  * store Scheme objects in memory
  */
 
-#include <map>
-
 class Frame : public Element {
 		Frame *next_;
 		std::map<std::string, Element *> elements_;
