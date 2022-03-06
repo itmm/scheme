@@ -70,83 +70,57 @@ class Apply_Primitive: public Two_Primitive {
 class Numeric_Primitive : public Two_Primitive {
 	protected:
 		Element *apply_two(Element *a, Element *b) override;
-		virtual Element *do_int(const Integer &a, const Integer &b) = 0;
+		virtual Element *do_int(Integer &a, Integer &b) = 0;
 		virtual Element *do_float(double a, double b) = 0;
+		virtual Element *do_fract(Fraction &a, Fraction &b) = 0;
 };
 
-Element *Numeric_Primitive::apply_two(Element *a, Element *b) {
-	auto a_i { dynamic_cast<Integer *>(a) };
-	auto b_i { dynamic_cast<Integer *>(b) };
-	if (a_i && b_i) { return do_int(*a_i, *b_i); }
-	Float *a_f { nullptr }; Float *b_f { nullptr };
-	if (! a_i) { a_f = dynamic_cast<Float *>(a); }
-	if (! b_i) { b_f = dynamic_cast<Float *>(b); }
-	if ((a_i || a_f) && (b_i || b_f)) {
-		return do_float(
-			a_f ? a_f->value() : a_i->float_value(),
-			b_f ? b_f->value() : b_i->float_value()
-		);
-	}
-	return err("numeric", "invalid arguments", new Pair { a, b });
-}
-
-class Add_Primitive : public Numeric_Primitive {
+class Add_Primitive : public Two_Primitive {
 	protected:
-		Element *do_int(const Integer &a, const Integer &b) override {
-			return a + b;
-		}
-		Element *do_float(double a, double b) override {
-			return new Float { a + b };
+		Element *apply_two(Element *first, Element *second) override {
+			return add(first, second);
 		}
 };
 
-class Sub_Primitive : public Numeric_Primitive {
+class Sub_Primitive : public Two_Primitive {
 	protected:
-		Element *do_int(const Integer &a, const Integer &b) override {
-			return a - b;
-		}
-		Element *do_float(double a, double b) override {
-			return new Float { a - b };
+		Element *apply_two(Element *first, Element *second) override {
+			return sub(first, second);
 		}
 };
 
-class Mul_Primitive : public Numeric_Primitive {
+class Mul_Primitive : public Two_Primitive {
 	protected:
-		Element *do_int(const Integer &a, const Integer &b) override {
-			return a * b;
-		}
-		Element *do_float(double a, double b) override {
-			return new Float { a * b };
+		Element *apply_two(Element *first, Element *second) override {
+			return mult(first, second);
 		}
 };
 
-class Div_Primitive : public Numeric_Primitive {
+class Div_Primitive : public Two_Primitive {
 	protected:
-		Element *do_int(const Integer &a, const Integer &b) override {
-			return a / b;
-		}
-		Element *do_float(double a, double b) override {
-			return new Float { a / b };
+		Element *apply_two(Element *first, Element *second) override {
+			return div(first, second);
 		}
 };
 
-class Less_Primitive : public Numeric_Primitive {
+class Remainder_Primitive : public Two_Primitive {
 	protected:
-		Element *do_int(const Integer &a, const Integer &b) override {
-			return to_bool(a < b);
-		}
-		Element *do_float(double a, double b) override {
-			return to_bool(a < b);
+		Element *apply_two(Element *first, Element *second) override {
+			return remainder(first, second);
 		}
 };
 
-class Equal_Primitive : public Numeric_Primitive {
+class Less_Primitive : public Two_Primitive {
 	protected:
-		Element *do_int(const Integer &a, const Integer &b) override {
-			return to_bool(a == b);
+		Element *apply_two(Element *first, Element *second) override {
+			return less(first, second);
 		}
-		Element *do_float(double a, double b) override {
-			return to_bool(a == b);
+};
+
+class Equal_Primitive : public Two_Primitive {
+	protected:
+		Element *apply_two(Element *first, Element *second) override {
+			return is_equal_num(first, second);
 		}
 };
 
@@ -194,4 +168,5 @@ void setup_primitives() {
 	initial_frame.insert("apply", new Apply_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 	initial_frame.insert("eq?", new Eq_Primitive());
+	initial_frame.insert("remainder", new Remainder_Primitive());
 }

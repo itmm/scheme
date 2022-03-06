@@ -88,6 +88,7 @@
 		   ((= kinds-of-coins 4) 25)
 		   ((= kinds-of-coins 5) 50)))
    (count-change 100)))
+(garbage-collect)
 ((lambda()
    (define (even? n) (= (remainder n 2) 0))
    (define (square n) (* n n))

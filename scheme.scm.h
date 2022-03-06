@@ -16,7 +16,6 @@
 "  (lambda args (accumulate init op args)))\n"
 "(define + (#mk-simple-numeric #binary+ 0))\n"
 "(define * (#mk-simple-numeric #binary* 1))\n"
-"(define (remainder a b) (- a (* (/ a b) b)))\n"
 "(define (#mk-special-numeric op init)\n"
 "  (lambda args\n"
 "    (cond ((null? args) init)\n"
