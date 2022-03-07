@@ -185,6 +185,20 @@ class Print_Primitive : public Primitive {
 		}
 };
 
+class Negate_Primitive: public One_Primitive {
+	protected:
+		Element *apply_one(Element *arg) override {
+			return negate(arg);
+		}
+};
+
+class Is_Negative_Primitive: public One_Primitive {
+	protected:
+		Element *apply_one(Element *arg) override {
+			return to_bool(is_negative(arg));
+		}
+};
+
 Frame initial_frame { nullptr };
 
 void setup_primitives() {
@@ -196,6 +210,8 @@ void setup_primitives() {
 	initial_frame.insert("#binary-", new Sub_Primitive());
 	initial_frame.insert("#binary*", new Mul_Primitive());
 	initial_frame.insert("#binary/", new Div_Primitive());
+	initial_frame.insert("#negate", new Negate_Primitive());
+	initial_frame.insert("#negative?", new Is_Negative_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
 	initial_frame.insert("null?", new Null_Primitive());

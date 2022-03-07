@@ -87,6 +87,7 @@ class Integer : public Element {
 		}
 		bool is_zero() const { return digits_.empty(); }
 		std::ostream &write(std::ostream &out) const override {
+			if (negative()) { out << '-'; }
 			if (digits_.empty()) { return out << '0'; }
 			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
 				out << static_cast<char>('0' + *i);
@@ -102,10 +103,7 @@ class Negative_Integer : public Integer {
 		Negative_Integer(unsigned value): Integer { value } { }
 		Negative_Integer(const Digits &digits): Integer { digits } { }
 		Negative_Integer(Digits &&digits): Integer { std::move(digits) } { }
-		virtual bool negative() const { return true; }
-		std::ostream &write(std::ostream &out) const override {
-			return Integer::write(out << "(- ") << ')';
-		}
+		virtual bool negative() const { return ! is_zero(); }
 };
 
 Integer *Integer::negate() const { 
@@ -264,7 +262,7 @@ Element *less(Element *a, Element *b);
 
 Element *sub(Element *a, Element *b) {
 	auto a_neg { is_negative(a) };
-	auto b_neg { is_negative(a) };
+	auto b_neg { is_negative(b) };
 	if (! a_neg && b_neg) {
 		return add(a, negate(b));
 	} else if (a_neg && b_neg) {
