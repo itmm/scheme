@@ -258,6 +258,14 @@ bool is_valid_set(Pair *lst) {
 		is_null(cdddr(lst));
 }
 
+bool is_assert_special(Pair * lst) {
+	return is_tagged_list(lst, "assert");
+}
+
+bool is_valid_assert(Pair *lst) {
+	return is_good(cadr(lst)) && is_null(cddr(lst));
+}
+
 Element *eval(Element *exp, Frame *env) {
 	if (is_err(exp) || ! exp) { return exp; }
 	auto int_value { dynamic_cast<Integer *>(exp) };
@@ -345,6 +353,14 @@ Element *eval(Element *exp, Frame *env) {
 			auto val { eval(set_value(lst_value), env) };
 			ASSERT(is_good(val), "set!");
 			return env->update(sym, val);
+		}
+		if (is_assert_special(lst_value)) {
+			ASSERT(is_valid_assert(lst_value), "assert");
+			auto val { eval(cadr(lst_value), env) };
+			if (is_false(val)) {
+				return err("assert", "failed", lst_value);
+			}
+			return to_bool(true);
 		}
 		auto lst { eval_list(lst_value, env) };
 		return apply(car(lst), cdr(lst));

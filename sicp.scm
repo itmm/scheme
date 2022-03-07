@@ -2,14 +2,14 @@
 ; examples from "Structure and Interpretation of Computer Programs"
 ; defines are scoped into functions to avoid namespace pollution
 
-486
-(+ 137 349)
-(- 1000 334)
-(* 5 99)
-(/ 10 2)
-(+ 2.7 10)
-(+ 21 35 12 7)
-(* 25 4 12)
+(assert 486)
+(assert (= (+ 137 349) 486))
+(assert (= (- 1000 334) 666))
+(assert (= (* 5 99) 495))
+(assert (= (/ 10 2) 5))
+(assert (= (+ 2.7 10) 12.7))
+(assert (= (+ 21 35 12 7) 75))
+(assert (= (* 25 4 12) 1200))
 (+ (* 3 5) (- 10 6))
 (+ (* 3 (+ (* 2 4) (+ 3 5))) (+ (- 10 7) 6))
 (+ (* 3

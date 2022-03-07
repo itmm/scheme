@@ -52,6 +52,7 @@ class Symbol : public Element {
 std::map<std::string, Symbol *> Symbol::symbols_;
 
 #include <vector>
+#include <algorithm>
 
 class Integer : public Element {
 	public:
@@ -79,8 +80,8 @@ class Integer : public Element {
 		const Digits &digits() const { return digits_; }
 		double float_value() const { 
 			double result { 0.0 };
-			for (const auto &c: digits_) {
-				result = result * 10.0 + c;
+			for (auto it { digits_.rbegin() }; it != digits_.rend(); ++it) {
+				result = result * 10.0 + *it;
 			}
 			return result;
 		}
