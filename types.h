@@ -16,6 +16,13 @@ class Value_Element : public Element {
 };
 
 using Float = Value_Element<double>;
+class String : public Value_Element<std::string> {
+	public:
+		String(const std::string &value) : Value_Element(value) { }
+		std::ostream &write(std::ostream &out) const override {
+			return out << '"' << value() << '"';
+		}
+};
 
 #include <map>
 

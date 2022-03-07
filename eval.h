@@ -266,6 +266,8 @@ Element *eval(Element *exp, Frame *env) {
 	if (float_value) { return float_value; }
 	auto fract_value { dynamic_cast<Fraction *>(exp) };
 	if (fract_value) { return fract_value; }
+	auto str_value { dynamic_cast<String *>(exp) };
+	if (str_value) { return str_value; }
 	auto sym_value { dynamic_cast<Symbol *>(exp) };
 	if (sym_value) {
 		return env->has(sym_value->value()) ? env->get(sym_value->value()) : exp;

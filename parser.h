@@ -73,6 +73,18 @@ Element *read_expression(std::istream &in) {
 		while (ch != EOF && ch != '\n') { ch = in.get(); }
 		return read_expression(in);
 	}
+	if (ch == '"') {
+		std::ostringstream result;
+		ch = in.get();
+		while (ch != EOF && ch != '"') {
+			result << static_cast<char>(ch);
+			ch = in.get();
+		}
+		ASSERT(ch == '"', "read");
+		ch = in.get();
+		return new String { result.str() };
+	}
+
 	std::ostringstream result;
 	bool numeric { true };
 	unsigned value { 0 };
