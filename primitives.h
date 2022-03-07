@@ -124,9 +124,19 @@ class Equal_Primitive : public Two_Primitive {
 		}
 };
 
-class Garbage_Collect_Primitive : public Primitive {
+class Zero_Primitive : public Primitive {
+	protected:
+		virtual Element *apply_zero() = 0;
 	public:
 		Element *apply(Element *args) override {
+			ASSERT(is_null(args), "zero primitive");
+			return apply_zero();
+		}
+};
+
+class Garbage_Collect_Primitive : public Zero_Primitive {
+	protected:
+		Element *apply_zero() override {
 			auto result { Element::garbage_collect() };
 			return new Pair {
 				Symbol::get("collected"),
@@ -151,6 +161,30 @@ class Eq_Primitive : public Two_Primitive {
 		}
 };
 
+std::ostream *out { &std::cout };
+
+class Newline_Primitive : public Zero_Primitive {
+	protected:
+		Element *apply_zero() override {
+			if (out) { *out << '\n'; }
+			return nullptr;
+		}
+};
+
+class Print_Primitive : public Primitive {
+	public:
+		Element *apply(Element *args) override {
+			if (out) {
+				bool first { true };
+				for (; ! is_null(args); args = cdr(args)) {
+					if (first) { first = false; } else { *out << ' '; }
+					*out << car(args);
+				}
+			}
+			return nullptr;
+		}
+};
+
 Frame initial_frame { nullptr };
 
 void setup_primitives() {
@@ -169,4 +203,6 @@ void setup_primitives() {
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 	initial_frame.insert("eq?", new Eq_Primitive());
 	initial_frame.insert("remainder", new Remainder_Primitive());
+	initial_frame.insert("newline", new Newline_Primitive());
+	initial_frame.insert("print", new Print_Primitive());
 }

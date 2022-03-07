@@ -15,22 +15,35 @@
 #include "primitives.h"
 #include "garbage-collect.h"
 
-void process_stream(std::istream &in, std::ostream *out, bool prompt) {
+std::ostream *prompt { nullptr };
+std::ostream *result { nullptr };
+
+void process_stream(std::istream &in) {
 	active_frames.clear();
 	active_frames.push_back(&initial_frame);
 
-	if (prompt && out) { *out << "? "; }
+	if (prompt) { *prompt << "? "; }
 	ch = in.get();
 	if (ch == '#') {
 		while (ch != EOF && ch != '\n') { ch = in.get(); }
 	}
 	for (;;) {
 		auto exp { read_expression(in) };
-		if (! exp) { break; }
+		if (! in) { break; }
 		exp = eval(exp, &initial_frame);
-		if (out) { *out << exp << "\n"; }
-		if (prompt && out) { *out << "? "; }
+		if (result) { *result << exp << "\n"; }
+		if (prompt) { *prompt << "? "; }
 	}
+}
+
+void process_stdin() {
+	auto old_prompt { prompt };
+	auto old_result { result };
+	prompt = &std::cout;
+	result = &std::cout;
+	process_stream(std::cin);
+	result = old_result;
+	prompt = old_prompt;
 }
 
 #include <fstream>
@@ -41,19 +54,22 @@ int main(int argc, const char *argv[]) {
 		std::istringstream s { 
 			#include "scheme.scm.h"
 		};
-		process_stream(s, nullptr, false);
+		process_stream(s);
 	}
 
 	if (argc > 1) {
 		for (int i { 1 }; i < argc; ++i) {
 			if (argv[i] == std::string { "-" }) {
-				process_stream(std::cin, &std::cout, true);
+				process_stdin();
 			} else {
 				std::ifstream in { argv[i] };
-				process_stream(in, &std::cout, false);
+				auto old_result { result };
+				result = &std::cout;
+				process_stream(in);
+				result = old_result;
 			}
 		}
 	} else {
-		process_stream(std::cin, &std::cout, true);
+		process_stdin();
 	}
 }

@@ -3,6 +3,8 @@
  */
 #include <string>
 
+std::ostream *err_stream { &std::cerr };
+
 class Error : public Element {
 		std::string raiser_;
 		std::string message_;
@@ -29,7 +31,7 @@ class Error : public Element {
 
 Element *err(const std::string fn, const std::string msg, Element *exp = nullptr) {
 	auto er { new Error { fn, msg, exp } };
-	std::cerr << er << '\n';
+	if (err_stream) { *err_stream << er << '\n'; }
 	return er;
 }
 
