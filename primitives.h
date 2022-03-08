@@ -53,13 +53,6 @@ class Cons_Primitive : public Two_Primitive {
 		}
 };
 
-class Null_Primitive: public One_Primitive {
-	protected:
-		Element *apply_one(Element *arg) override {
-			return to_bool(is_null(arg));
-		}
-};
-
 class Apply_Primitive: public Two_Primitive {
 	protected:
 		Element *apply_two(Element *first, Element *second) override {
@@ -214,7 +207,6 @@ void setup_primitives() {
 	initial_frame.insert("#negative?", new Is_Negative_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
-	initial_frame.insert("null?", new Null_Primitive());
 	initial_frame.insert("apply", new Apply_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 	initial_frame.insert("eq?", new Eq_Primitive());

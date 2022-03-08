@@ -8,7 +8,8 @@
 (define true #t)
 (define false #f)
 (define (> a b) (< b a))
-(define (not a) (if a false true))
+(define (null? a) (if a false true))
+(define not null?)
 (define (accumulate start op lst)
   (if (null? lst) start
       (accumulate (op start (car lst)) op (cdr lst))))

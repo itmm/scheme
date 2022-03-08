@@ -118,7 +118,7 @@
 	 (= (remainder b a) 0))
    (define (prime? n)
 	 (= n (smallest-divisor n)))
-   (assert (null? (prime? 33)))
+   (assert (not (prime? 33)))
    (assert (prime? 11))))
 (define (even? n) (= (remainder n 2) 0))
 (define (square n) (* n n))
