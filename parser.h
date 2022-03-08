@@ -31,27 +31,6 @@ Element *read_list(std::istream &in) {
 	return new Pair { exp, read_list(in) };
 }
 
-bool is_float(const std::string &v) {
-	auto i = v.begin();
-	if (i == v.end()) { return false; }
-	if (*i == '+' || *i == '-') { ++i; }
-	bool digits { false };
-	bool dot { false };
-	for (; i != v.end(); ++i) {
-		if (*i >= '0' && *i <= '9') {
-			digits = true;
-		} else if (*i == '.') {
-			if (dot) { return false; }
-			if (! digits) { return false; }
-			digits = false;
-			dot = true;
-		} else { 
-			return false;
-		}
-	}
-	return dot && digits;
-}
-
 double float_value(const std::string &v) {
 	return std::stod(v);
 }
@@ -87,19 +66,30 @@ Element *read_expression(std::istream &in) {
 
 	std::ostringstream result;
 	bool numeric { true };
-	unsigned value { 0 };
+	bool digits { false };
+	bool dots { false };
+	bool first { true };
 	for (;;) {
-		if (ch >= '0' && ch <= '9') {
-			value = value * 10 + (ch - '0');
+		if (first && (ch == '+' || ch == '-')) {
+		} else if (ch >= '0' && ch <= '9') {
+			digits = true;
+		} else if (ch == '.') {
+			if (dots || ! digits) {
+				numeric = false;
+			} else {
+				digits = false;
+				dots = true;
+			}
 		} else {
 			numeric = false;
 		}
+		first = false;
 		result << static_cast<char>(ch);
 		ch = in.get();
 		if (ch == EOF || ch <= ' ' || ch == '(' || ch == ')') { break; }
 	}
-	if (numeric) { return new Integer { value }; }
-	if (is_float(result.str())) {
+	if (numeric && digits && ! dots) { return Integer::create(result.str()); }
+	if (numeric && digits && dots) {
 		return new Float { float_value(result.str()) };
 	}
 	return Symbol::get(result.str());

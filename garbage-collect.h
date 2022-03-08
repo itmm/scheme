@@ -14,7 +14,7 @@ std::pair<unsigned, unsigned> Element::garbage_collect() {
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
-		if (cur != &One && cur != &Zero && cur->mark_ != current_mark) {
+		if (cur != One && cur != Zero && cur->mark_ != current_mark) {
 			++collected;
 			auto tmp { cur->next_ };
 			delete cur;

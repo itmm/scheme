@@ -134,11 +134,11 @@ class Garbage_Collect_Primitive : public Zero_Primitive {
 			return new Pair {
 				Symbol::get("collected"),
 				new Pair {
-					new Integer { result.first },
+					Integer::create(result.first),
 					new Pair {
 						Symbol::get("kept"),
 						new Pair {
-							new Integer { result.second },
+							Integer::create(result.second),
 							nullptr
 						}
 					}

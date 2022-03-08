@@ -65,18 +65,14 @@ class Integer : public Element {
 			}
 		}
 	public:
-		Integer(unsigned value) {
-			while (value) {
-				digits_.push_back(value % 10);
-				value /= 10;
-			}
-		}
 		Integer(const Digits &digits): digits_ { digits } {
 			normalize();
 		}
 		Integer(Digits &&digits): digits_ { std::move(digits) } {
 			normalize();
 		}
+		static Element *create(const std::string &digits);
+		static Element *create(unsigned value);
 		const Digits &digits() const { return digits_; }
 		double float_value() const { 
 			double result { 0.0 };
@@ -86,33 +82,62 @@ class Integer : public Element {
 			return result;
 		}
 		bool is_zero() const { return digits_.empty(); }
+		virtual bool is_negative() const { return false; }
+		Integer *negate() const;
 		std::ostream &write(std::ostream &out) const override {
-			if (negative()) { out << '-'; }
+			if (is_negative()) { out << '-'; }
 			if (digits_.empty()) { return out << '0'; }
 			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
 				out << static_cast<char>('0' + *i);
 			}
 			return out;
 		}
-		virtual bool negative() const { return false; }
-		Integer *negate() const;
 };
 
 class Negative_Integer : public Integer {
 	public:
-		Negative_Integer(unsigned value): Integer { value } { }
 		Negative_Integer(const Digits &digits): Integer { digits } { }
 		Negative_Integer(Digits &&digits): Integer { std::move(digits) } { }
-		virtual bool negative() const { return ! is_zero(); }
+		virtual bool is_negative() const { return ! is_zero(); }
 };
 
 Integer *Integer::negate() const { 
-	if (negative() || is_zero()) {
+	if (is_negative() || is_zero()) {
 		return new Integer { digits_ };
 	} else {
 		return new Negative_Integer { digits_ };
 	}
 }
+
+Element *Integer::create(const std::string &digits) {
+	Integer::Digits result;
+	bool negative { false };
+	for (auto it { digits.rbegin() }; it != digits.rend(); ++it) {
+		if (*it == '+') { continue; }
+		if (*it == '-') { negative = ! negative; continue; }
+		int digit { *it - '0' };
+		if (digit < 0 || digit > 9) {
+			return err("integer", "invalid digits", new String { digits });
+		}
+		result.push_back(digit);
+	}
+	if (negative) {
+		return new Negative_Integer { std::move(result) };
+	} else {
+		return new Integer { std::move(result) };
+	}
+}
+
+Element *Integer::create(unsigned value) {
+	Integer::Digits result;
+	for (; value; value /= 10) {
+		result.push_back(value % 10);
+	}
+	return new Integer { std::move(result) };
+}
+
+auto One { Integer::create("1") };
+auto Zero { Integer::create("0") };
 
 class Fraction : public Element {
 		Integer *nom_;
@@ -148,7 +173,7 @@ Element *negate(Element *a) {
 
 bool is_negative(Element *a) {
 	auto ai { dynamic_cast<Integer *>(a) };
-	if (ai) { return ai->negative(); };
+	if (ai) { return ai->is_negative(); };
 	auto afr { dynamic_cast<Fraction *>(a) };
 	if (afr) { return is_negative(afr->nom()); };
 	auto afl { dynamic_cast<Float *>(a) };
@@ -177,8 +202,33 @@ class Propagate {
 		Element *propagate(Element *a, Element *b);
 };
 
-Integer One { 1 };
-Integer Zero { 0 };
+Element *Propagate::propagate(Element *a, Element *b) {
+	auto ai { dynamic_cast<Integer *>(a) };
+	auto bi { dynamic_cast<Integer *>(b) };
+	if (ai && bi) { return apply_int(ai, bi); }
+	auto afr { dynamic_cast<Fraction *>(a) };
+	auto bfr { dynamic_cast<Fraction *>(b) };
+	if (afr || bfr) {
+		if (! afr && ai) { afr = Fraction::create_forced(ai, dynamic_cast<Integer *>(One)); }
+		if (! bfr && bi) { bfr = Fraction::create_forced(bi, dynamic_cast<Integer *>(One)); }
+			if (afr && bfr) { return apply_fract(afr, bfr); }
+	}
+	auto afl { dynamic_cast<Float *>(a) };
+	auto bfl { dynamic_cast<Float *>(b) };
+	if (afl || bfl) {
+		if (! afl) {
+			if (ai) { afl = new Float { ai->float_value() }; }
+			else if (afr) { afl = new Float { afr->nom()->float_value() / afr->denum()->float_value() }; }
+		}
+		if (! bfl) {
+			if (bi) { bfl = new Float { bi->float_value() }; }
+			else if (bfr) { bfl = new Float { bfr->nom()->float_value() / bfr->denum()->float_value() }; }
+		}
+		if (afl && bfl) { return apply_float(afl, bfl); }
+	}
+
+	return err("propagate", "can't propagate", a, b);
+}
 
 Element *add(Element *a, Element *b);
 Element *mult(Element *a, Element *b);
@@ -441,11 +491,11 @@ bool is_int(Element *a) {
 
 Element *remainder(Element *a, Element *b) {
 	ASSERT(is_int(a) && is_int(b), "remainder");
-	if (is_true(is_equal_num(b, &One))) { return &Zero; }
+	if (is_true(is_equal_num(b, One))) { return Zero; }
 	if (is_true(less(a, b))) { return a; }
 
-	Element *min { &One };
-	Element *max { new Integer { 2 } };
+	Element *min { One };
+	Element *max { Integer::create("2") };
 
 	for (;;) {
 		auto prod { mult(max, b) };
@@ -455,7 +505,7 @@ Element *remainder(Element *a, Element *b) {
 
 	for (;;) {
 		auto diff { sub(max, min) };
-		if (is_false(less(&One, diff))) { break; }
+		if (is_false(less(One, diff))) { break; }
 		auto mid { half(add(max, min)) };
 		auto prod { mult(mid, b) };
 		if (is_true(less(prod, a))) { min = mid; }
@@ -467,14 +517,14 @@ Element *remainder(Element *a, Element *b) {
 
 Integer *div_int(Integer *a, Integer *b) {
 	if (! a || ! b) { err("div_int", "no int"); return nullptr; }
-	if (b->negative()) { return div_int(a->negate(), b->negate()); }
-	if (a->negative()) {
+	if (b->is_negative()) { return div_int(a->negate(), b->negate()); }
+	if (a->is_negative()) {
 		auto res { div_int(a->negate(), b) };
 		return res ? res->negate() : nullptr;
 	}
 
-	Element *min { &One };
-	Element *max { new Integer { 2 } };
+	Element *min { One };
+	Element *max { Integer::create("2") };
 
 	for (;;) {
 		auto prod { mult(max, b) };
@@ -484,7 +534,7 @@ Integer *div_int(Integer *a, Integer *b) {
 
 	for (;;) {
 		auto diff { sub(max, min) };
-		if (is_false(less(&One, diff))) { break; }
+		if (is_false(less(One, diff))) { break; }
 		auto mid { half(add(max, min)) };
 		auto prod { mult(mid, b) };
 		if (is_true(less(prod, a))) { min = mid; }
@@ -509,7 +559,7 @@ Fraction *Fraction::create_forced(Integer *nom, Integer *denum) {
 	}
 
 	auto g { dynamic_cast<Integer *>(gcd(nom, denum)) };
-	if (nom && denum && g && is_false(is_equal_num(g, &One))) {
+	if (nom && denum && g && is_false(is_equal_num(g, One))) {
 		nom = div_int(nom, g);
 		denum = div_int(denum, g);
 		if (! nom || ! denum) { err("fraction", "gcd"); return nullptr; }
@@ -529,12 +579,12 @@ Element *Fraction::create(Element *nom, Element *denum) {
 	auto di { dynamic_cast<Integer *>(denum) };
 	ASSERT(ni && di, "fraction");
 	auto g { dynamic_cast<Integer *>(gcd(ni, di)) };
-	if (g && is_false(is_equal_num(g, &One))) {
+	if (g && is_false(is_equal_num(g, One))) {
 		ni = div_int(ni, g);
 		di = div_int(di, g);
 		ASSERT(ni && di, "fraction");
 	}
-	if (is_true(is_equal_num(&One, di))) {
+	if (is_true(is_equal_num(One, di))) {
 		return ni;
 	}
 	return new Fraction { ni, di };
@@ -543,7 +593,7 @@ Element *Fraction::create(Element *nom, Element *denum) {
 #define True One
 
 Element *to_bool(bool cond) {
-	return cond ?  &True : nullptr;
+	return cond ?  True : nullptr;
 }
 
 bool is_true(Element *value) {
@@ -591,34 +641,6 @@ std::ostream &Pair::write(std::ostream &out) const {
 	}
 	out << ')';
 	return out;
-}
-
-Element *Propagate::propagate(Element *a, Element *b) {
-	auto ai { dynamic_cast<Integer *>(a) };
-	auto bi { dynamic_cast<Integer *>(b) };
-	if (ai && bi) { return apply_int(ai, bi); }
-	auto afr { dynamic_cast<Fraction *>(a) };
-	auto bfr { dynamic_cast<Fraction *>(b) };
-	if (afr || bfr) {
-		if (! afr && ai) { afr = Fraction::create_forced(ai, &One); }
-		if (! bfr && bi) { bfr = Fraction::create_forced(bi, &One); }
-			if (afr && bfr) { return apply_fract(afr, bfr); }
-	}
-	auto afl { dynamic_cast<Float *>(a) };
-	auto bfl { dynamic_cast<Float *>(b) };
-	if (afl || bfl) {
-		if (! afl) {
-			if (ai) { afl = new Float { ai->float_value() }; }
-			else if (afr) { afl = new Float { afr->nom()->float_value() / afr->denum()->float_value() }; }
-		}
-		if (! bfl) {
-			if (bi) { bfl = new Float { bi->float_value() }; }
-			else if (bfr) { bfl = new Float { bfr->nom()->float_value() / bfr->denum()->float_value() }; }
-		}
-		if (afl && bfl) { return apply_float(afl, bfl); }
-	}
-
-	return err("propagate", "can't propagate", a, b);
 }
 
 Element *car(Element *lst) {
