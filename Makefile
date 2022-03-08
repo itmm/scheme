@@ -1,4 +1,4 @@
-.PHONY: clean
+.PHONY: clean lines
 
 CXXFLAGS += -g -Wall
 
@@ -12,3 +12,6 @@ scheme.cpp: $(wildcard *.h)
 
 clean:
 	rm -f scheme
+
+lines:
+	cat *.cpp *.h | wc -l
