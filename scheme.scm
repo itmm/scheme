@@ -21,7 +21,7 @@
   (lambda args
     (cond ((null? args) init)
           ((null? (cdr args)) (op init (car args)))
-	  (else (accumulate (car args) op (cdr args))))))
+		  (else (accumulate (car args) op (cdr args))))))
 (define - (#mk-special-numeric #binary- 0))
 (define / (#mk-special-numeric #binary/ 1))
 

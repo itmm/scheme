@@ -21,7 +21,7 @@
 "  (lambda args\n"
 "    (cond ((null? args) init)\n"
 "          ((null? (cdr args)) (op init (car args)))\n"
-"\t  (else (accumulate (car args) op (cdr args))))))\n"
+"\t\t  (else (accumulate (car args) op (cdr args))))))\n"
 "(define - (#mk-special-numeric #binary- 0))\n"
 "(define / (#mk-special-numeric #binary/ 1))\n"
 "\n"

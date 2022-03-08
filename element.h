@@ -8,14 +8,43 @@
 
 class Element {
 		Element *next_;
-		bool mark_;
 
 		static Element *all_elements;
 		static bool current_mark;
 
+		bool get_mark() {
+			return static_cast<bool>(reinterpret_cast<size_t>(next_) & 0x1);
+		}
+
+		bool has_current_mark() {
+			return get_mark() == current_mark;
+		}
+
+		void toggle_mark() {
+			next_ = reinterpret_cast<Element *>(
+				reinterpret_cast<size_t>(next_) ^ 0x1
+			);
+		}
+
+		static Element *add_mark(Element *ptr, bool mark) {
+			return reinterpret_cast<Element *>(
+				reinterpret_cast<size_t>(ptr) | static_cast<size_t>(mark)
+			);
+		}
+
+		static Element *add_current_mark(Element *ptr) {
+			return add_mark(ptr, current_mark);
+		}
+
+		static Element *remove_mark(Element *marked, bool mark) {
+			return reinterpret_cast<Element *>(
+				reinterpret_cast<size_t>(marked) ^ static_cast<size_t>(mark)
+			);
+		}
+
 		void mark() {
-			if (mark_ != current_mark) {
-				mark_ = current_mark;
+			if (! has_current_mark()) {
+				toggle_mark();
 				propagate_mark();
 			}
 		}
@@ -26,7 +55,7 @@ class Element {
 		void mark(Element *elm) { if (elm) { elm->mark(); } }
 
 	public:
-		Element(): next_ { all_elements }, mark_ { current_mark } {
+		Element(): next_ { add_current_mark(all_elements) } {
 			all_elements = this;
 		}
 		virtual ~Element() { }

@@ -14,18 +14,20 @@ std::pair<unsigned, unsigned> Element::garbage_collect() {
 	Element *prev { nullptr };
 	Element *cur { all_elements };
 	while (cur) {
-		if (cur != One && cur != Zero && cur->mark_ != current_mark) {
+		auto mark { cur->get_mark() };
+		if (cur != One && cur != Zero && mark != current_mark) {
 			++collected;
-			auto tmp { cur->next_ };
+			auto tmp { remove_mark(cur->next_, mark) };
 			delete cur;
 			cur = tmp;
 			if (prev) {
-				prev->next_ = cur;	
+				bool prev_mark { prev->get_mark() };
+				prev->next_ = add_mark(cur, prev_mark);
 			} else { all_elements = cur; }
 		} else {
 			++kept;
 			prev = cur;
-			cur = cur->next_;
+			cur = remove_mark(cur->next_, mark);
 		}
 	}
 	return { collected, kept };
