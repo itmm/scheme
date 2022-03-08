@@ -618,7 +618,7 @@ Element *Propagate::propagate(Element *a, Element *b) {
 		if (afl && bfl) { return apply_float(afl, bfl); }
 	}
 
-	return err("propagate", "can't propagate", new Pair { a, b });
+	return err("propagate", "can't propagate", a, b);
 }
 
 Element *car(Element *lst) {
