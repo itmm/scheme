@@ -321,7 +321,7 @@ Element *eval(Element *exp, Frame *env) {
 		}
 		if (is_and_special(lst_value)) {
 			auto cur { cdr(lst_value) };
-			Element *result { True };
+			Element *result { one };
 			for (; is_good(cur) && cur; cur = cdr(cur)) {
 				result = eval(car(cur), env);
 				ASSERT(is_good(result), "and");

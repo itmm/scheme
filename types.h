@@ -56,7 +56,7 @@ std::map<std::string, Symbol *> Symbol::symbols_;
 
 class Integer : public Element {
 	public:
-		using Digits = std::vector<char>;
+		using Digits = std::vector<unsigned short>;
 	private:
 		Digits digits_;
 		void normalize() {
@@ -77,7 +77,7 @@ class Integer : public Element {
 		double float_value() const { 
 			double result { 0.0 };
 			for (auto it { digits_.rbegin() }; it != digits_.rend(); ++it) {
-				result = result * 10.0 + *it;
+				result = result * 10000.0 + *it;
 			}
 			return result;
 		}
@@ -87,8 +87,29 @@ class Integer : public Element {
 		std::ostream &write(std::ostream &out) const override {
 			if (is_negative()) { out << '-'; }
 			if (digits_.empty()) { return out << '0'; }
+			bool first { true };
 			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
-				out << static_cast<char>('0' + *i);
+				unsigned val { *i };
+				unsigned d0 { val % 10 }; val /= 10;
+				unsigned d1 { val % 10 }; val /= 10;
+				unsigned d2 { val % 10 }; val /= 10;
+				unsigned d3 { val % 10 };
+				if (d3 || ! first) {
+					out << static_cast<char>('0' + d3);
+					first = false;
+				}
+				if (d2 || ! first) {
+					out << static_cast<char>('0' + d2);
+					first = false;
+				}
+				if (d1 || ! first) {
+					out << static_cast<char>('0' + d1);
+					first = false;
+				}
+				if (d0 || ! first) {
+					out << static_cast<char>('0' + d0);
+					first = false;
+				}
 			}
 			return out;
 		}
@@ -112,15 +133,19 @@ Integer *Integer::negate() const {
 Element *Integer::create(const std::string &digits) {
 	Integer::Digits result;
 	bool negative { false };
-	for (auto it { digits.rbegin() }; it != digits.rend(); ++it) {
+	unsigned short v { 0 };
+	unsigned short mult { 1 };
+	for (auto it { digits.rbegin() }; it != digits.rend(); ++it, mult *= 10) {
 		if (*it == '+') { continue; }
 		if (*it == '-') { negative = ! negative; continue; }
 		int digit { *it - '0' };
 		if (digit < 0 || digit > 9) {
 			return err("integer", "invalid digits", new String { digits });
 		}
-		result.push_back(digit);
+		v += digit * mult;
+		if (mult == 1000) { result.push_back(v); v = 0; mult = 1; }
 	}
+	if (v) { result.push_back(v); }
 	if (negative) {
 		return new Negative_Integer { std::move(result) };
 	} else {
@@ -130,14 +155,15 @@ Element *Integer::create(const std::string &digits) {
 
 Element *Integer::create(unsigned value) {
 	Integer::Digits result;
-	for (; value; value /= 10) {
-		result.push_back(value % 10);
+	for (; value; value /= 10000) {
+		result.push_back(value % 10000);
 	}
 	return new Integer { std::move(result) };
 }
 
-auto One { Integer::create("1") };
-auto Zero { Integer::create("0") };
+auto one { Integer::create(1) };
+auto two { Integer::create(2) };
+auto zero { Integer::create(0) };
 
 class Fraction : public Element {
 		Integer *nom_;
@@ -209,8 +235,8 @@ Element *Propagate::propagate(Element *a, Element *b) {
 	auto afr { dynamic_cast<Fraction *>(a) };
 	auto bfr { dynamic_cast<Fraction *>(b) };
 	if (afr || bfr) {
-		if (! afr && ai) { afr = Fraction::create_forced(ai, dynamic_cast<Integer *>(One)); }
-		if (! bfr && bi) { bfr = Fraction::create_forced(bi, dynamic_cast<Integer *>(One)); }
+		if (! afr && ai) { afr = Fraction::create_forced(ai, dynamic_cast<Integer *>(one)); }
+		if (! bfr && bi) { bfr = Fraction::create_forced(bi, dynamic_cast<Integer *>(one)); }
 			if (afr && bfr) { return apply_fract(afr, bfr); }
 	}
 	auto afl { dynamic_cast<Float *>(a) };
@@ -247,7 +273,7 @@ class Add_Propagate : public Propagate {
 				int v { carry };
 				if (a_i != a->digits().end()) { v += *a_i++; }
 				if (b_i != b->digits().end()) { v += *b_i++; }
-				if (v >= 10) { v -= 10; carry = 1; } else { carry = 0; }
+				if (v >= 10000) { v -= 10000; carry = 1; } else { carry = 0; }
 				digits.push_back(v);
 			}
 
@@ -288,7 +314,7 @@ class Sub_Propagate : public Propagate {
 				if (a_i == a->digits().end()) { break; }
 				int v = { *a_i++ + carry };
 				if (b_i != b->digits().end()) { v -= *b_i++; }
-				if (v < 0) { v += 10; carry = -1; } else { carry = 0; }
+				if (v < 0) { v += 10000; carry = -1; } else { carry = 0; }
 				digits.push_back(v);
 			}
 			return new Integer { std::move(digits) };
@@ -342,8 +368,8 @@ class Mul_Propagate : public Propagate {
 					while (idx >= digits.size()) { digits.push_back(0); }
 					int value { carry + digits[idx] };
 					if (b_i != b->digits().end()) { value += (*b_i++) * mult; }
-					carry = value / 10;
-					digits[idx] = value % 10;
+					carry = value / 10000;
+					digits[idx] = value % 10000;
 				}
 			}
 
@@ -479,7 +505,7 @@ static Element *half(Element *num) {
 	int carry { 0 };
 	for (int i { static_cast<int>(in->digits().size()) - 1}; i >= 0; --i) {
 		int v { carry + in->digits()[i] };
-		if (v % 2) { carry = 10; v -= 1; } else { carry = 0; }
+		if (v % 2) { carry = 10000; v -= 1; } else { carry = 0; }
 		result[i] = v/2;
 	}
 	return new Integer { std::move(result) };
@@ -491,11 +517,11 @@ bool is_int(Element *a) {
 
 Element *remainder(Element *a, Element *b) {
 	ASSERT(is_int(a) && is_int(b), "remainder");
-	if (is_true(is_equal_num(b, One))) { return Zero; }
+	if (is_true(is_equal_num(b, one))) { return zero; }
 	if (is_true(less(a, b))) { return a; }
 
-	Element *min { One };
-	Element *max { Integer::create("2") };
+	Element *min { one };
+	Element *max { two };
 
 	for (;;) {
 		auto prod { mult(max, b) };
@@ -505,7 +531,7 @@ Element *remainder(Element *a, Element *b) {
 
 	for (;;) {
 		auto diff { sub(max, min) };
-		if (is_false(less(One, diff))) { break; }
+		if (is_false(less(one, diff))) { break; }
 		auto mid { half(add(max, min)) };
 		auto prod { mult(mid, b) };
 		if (is_true(less(prod, a))) { min = mid; }
@@ -523,8 +549,8 @@ Integer *div_int(Integer *a, Integer *b) {
 		return res ? res->negate() : nullptr;
 	}
 
-	Element *min { One };
-	Element *max { Integer::create("2") };
+	Element *min { one };
+	Element *max { two };
 
 	for (;;) {
 		auto prod { mult(max, b) };
@@ -534,7 +560,7 @@ Integer *div_int(Integer *a, Integer *b) {
 
 	for (;;) {
 		auto diff { sub(max, min) };
-		if (is_false(less(One, diff))) { break; }
+		if (is_false(less(one, diff))) { break; }
 		auto mid { half(add(max, min)) };
 		auto prod { mult(mid, b) };
 		if (is_true(less(prod, a))) { min = mid; }
@@ -559,7 +585,7 @@ Fraction *Fraction::create_forced(Integer *nom, Integer *denum) {
 	}
 
 	auto g { dynamic_cast<Integer *>(gcd(nom, denum)) };
-	if (nom && denum && g && is_false(is_equal_num(g, One))) {
+	if (nom && denum && g && is_false(is_equal_num(g, one))) {
 		nom = div_int(nom, g);
 		denum = div_int(denum, g);
 		if (! nom || ! denum) { err("fraction", "gcd"); return nullptr; }
@@ -579,21 +605,19 @@ Element *Fraction::create(Element *nom, Element *denum) {
 	auto di { dynamic_cast<Integer *>(denum) };
 	ASSERT(ni && di, "fraction");
 	auto g { dynamic_cast<Integer *>(gcd(ni, di)) };
-	if (g && is_false(is_equal_num(g, One))) {
+	if (g && is_false(is_equal_num(g, one))) {
 		ni = div_int(ni, g);
 		di = div_int(di, g);
 		ASSERT(ni && di, "fraction");
 	}
-	if (is_true(is_equal_num(One, di))) {
+	if (is_true(is_equal_num(one, di))) {
 		return ni;
 	}
 	return new Fraction { ni, di };
 }
 
-#define True One
-
 Element *to_bool(bool cond) {
-	return cond ?  True : nullptr;
+	return cond ?  one : nullptr;
 }
 
 bool is_true(Element *value) {
