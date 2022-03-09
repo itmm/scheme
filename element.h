@@ -2,6 +2,8 @@
  * define base element for all Scheme-related types
  * it can be written to an output stream
  * and it is kept in a list to be garbage collected
+ * the lowest bit for the link-field is used as mark
+ * for the garbage collection algorithm
  */
 
 #include <iostream>
