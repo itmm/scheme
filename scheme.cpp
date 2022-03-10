@@ -46,6 +46,14 @@ void process_stdin() {
 	prompt = old_prompt;
 }
 
+void print_help() {
+	std::cout << "Usage: scheme [ --help ] [ FILE ]...\n"
+		"Interpret the Scheme FILEs.\n\n"
+		"Use standard input, if no files are specified or if - is\n"
+		"used as a file name.\n\n"
+		"    --help   display this help and exit\n";
+}
+
 #include <fstream>
 
 int main(int argc, const char *argv[]) {
@@ -59,7 +67,10 @@ int main(int argc, const char *argv[]) {
 
 	if (argc > 1) {
 		for (int i { 1 }; i < argc; ++i) {
-			if (argv[i] == std::string { "-" }) {
+			if (argv[i] == std::string { "--help" }) {
+				print_help();
+				break;
+			} else if (argv[i] == std::string { "-" }) {
 				process_stdin();
 			} else {
 				std::ifstream in { argv[i] };
