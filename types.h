@@ -515,32 +515,6 @@ bool is_int(Element *a) {
 	return dynamic_cast<Integer *>(a);
 }
 
-Element *remainder(Element *a, Element *b) {
-	ASSERT(is_int(a) && is_int(b), "remainder");
-	if (is_true(is_equal_num(b, one))) { return zero; }
-	if (is_true(less(a, b))) { return a; }
-
-	Element *min { one };
-	Element *max { two };
-
-	for (;;) {
-		auto prod { mult(max, b) };
-		if (is_false(less(prod, a))) { break; }
-		max = mult(max, max);
-	}
-
-	for (;;) {
-		auto diff { sub(max, min) };
-		if (is_false(less(one, diff))) { break; }
-		auto mid { half(add(max, min)) };
-		auto prod { mult(mid, b) };
-		if (is_true(less(prod, a))) { min = mid; }
-		else if (is_true(less(a, prod))) { max = mid; }
-		else { min = mid; break; }
-	}
-	return sub(a, mult(min, b));
-}
-
 Integer *div_int(Integer *a, Integer *b) {
 	if (! a || ! b) { err("div_int", "no int"); return nullptr; }
 	if (b->is_negative()) { return div_int(a->negate(), b->negate()); }
@@ -554,6 +528,7 @@ Integer *div_int(Integer *a, Integer *b) {
 
 	for (;;) {
 		auto prod { mult(max, b) };
+		if (is_equal_num(prod, a)) { return dynamic_cast<Integer *>(max); }
 		if (is_false(less(prod, a))) { break; }
 		max = mult(max, max);
 	}
@@ -568,6 +543,14 @@ Integer *div_int(Integer *a, Integer *b) {
 		else { min = mid; break; }
 	}
 	return dynamic_cast<Integer *>(min);
+}
+
+Element *remainder(Element *a, Element *b) {
+	ASSERT(is_int(a) && is_int(b), "remainder");
+	if (is_true(is_equal_num(b, one))) { return zero; }
+	if (is_true(less(a, b))) { return a; }
+
+	return sub(a, mult(div_int(dynamic_cast<Integer *>(a), dynamic_cast<Integer *>(b)), b));
 }
 
 Element *gcd(Element *a, Element *b) {
