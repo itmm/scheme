@@ -1,4 +1,10 @@
 #!./scheme
+; additional unit-tests
+
+(assert (= (/ 6 3) 2))
+(assert (= (remainder 6 3) 0))
+(assert (= (/ 10000 100) 100))
+
 ; examples from "Structure and Interpretation of Computer Programs"
 ; defines are scoped into functions to avoid namespace pollution
 
@@ -12,8 +18,6 @@
 (assert (= (* 25 4 12) 1200))
 (assert (= (+ (* 3 5) (- 10 6)) 19))
 (assert (= (+ (* 3 (+ (* 2 4) (+ 3 5))) (+ (- 10 7) 6)) 57))
-(assert (= (/ 6 3) 2))
-(assert (= (remainder 6 3) 0))
 (assert (= (+ (* 3
 	  (+ (* 2 4)
 		 (+ 3 5)))

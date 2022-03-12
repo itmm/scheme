@@ -135,7 +135,7 @@ Element *Integer::create(const std::string &digits) {
 	bool negative { false };
 	unsigned short v { 0 };
 	unsigned short mult { 1 };
-	for (auto it { digits.rbegin() }; it != digits.rend(); ++it, mult *= 10) {
+	for (auto it { digits.rbegin() }; it != digits.rend(); ++it) {
 		if (*it == '+') { continue; }
 		if (*it == '-') { negative = ! negative; continue; }
 		int digit { *it - '0' };
@@ -143,7 +143,11 @@ Element *Integer::create(const std::string &digits) {
 			return err("integer", "invalid digits", new String { digits });
 		}
 		v += digit * mult;
-		if (mult == 1000) { result.push_back(v); v = 0; mult = 1; }
+		if (mult == 1000) {
+			result.push_back(v); v = 0; mult = 1;
+		} else {
+			mult *= 10;
+		}
 	}
 	if (v) { result.push_back(v); }
 	if (negative) {
