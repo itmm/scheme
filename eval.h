@@ -80,15 +80,7 @@ Element *Procedure::apply(Element *arg_values) {
 		new_env->insert(sym->value(), arg_values);
 	}
 
-	cur = body_;
-	Element *value { nullptr };
-	for (; is_pair(cur); cur = cdr(cur)) {
-		Element *statement { car(cur) };
-		ASSERT(is_good(statement), "procedure");
-		value = eval(statement, new_env);
-	}
-	ASSERT(is_null(cur), "procedure");
-	return value;
+	return eval(new Pair { Symbol::get("begin"), body_ }, new_env);
 }
 
 Element *apply(Element *op, Element *operands) {
@@ -267,103 +259,107 @@ bool is_valid_assert(Pair *lst) {
 }
 
 Element *eval(Element *exp, Frame *env) {
-	if (is_err(exp) || ! exp) { return exp; }
-	auto int_value { dynamic_cast<Integer *>(exp) };
-	if (int_value) { return int_value; }
-	auto float_value { dynamic_cast<Float *>(exp) };
-	if (float_value) { return float_value; }
-	auto fract_value { dynamic_cast<Fraction *>(exp) };
-	if (fract_value) { return fract_value; }
-	auto str_value { dynamic_cast<String *>(exp) };
-	if (str_value) { return str_value; }
-	auto sym_value { dynamic_cast<Symbol *>(exp) };
-	if (sym_value) {
-		return env->has(sym_value->value()) ? env->get(sym_value->value()) : exp;
-	}
-	auto lst_value { dynamic_cast<Pair *>(exp) };
-	if (lst_value) {
-		if (is_define_special(lst_value)) {
-			auto key { dynamic_cast<Symbol *>(define_key(lst_value)) };
-			auto value { define_value(lst_value, env) };
-			ASSERT(key && is_good(value), "define");
-			env->insert(key->value(), value);
-			return value;
+	for (;;) {
+		if (is_err(exp) || ! exp) { return exp; }
+		auto int_value { dynamic_cast<Integer *>(exp) };
+		if (int_value) { return int_value; }
+		auto float_value { dynamic_cast<Float *>(exp) };
+		if (float_value) { return float_value; }
+		auto fract_value { dynamic_cast<Fraction *>(exp) };
+		if (fract_value) { return fract_value; }
+		auto str_value { dynamic_cast<String *>(exp) };
+		if (str_value) { return str_value; }
+		auto sym_value { dynamic_cast<Symbol *>(exp) };
+		if (sym_value) {
+			return env->has(sym_value->value()) ? env->get(sym_value->value()) : exp;
 		}
-		if (is_lambda_special(lst_value)) {
-			auto args { lambda_args(lst_value) };
-			auto body { lambda_body(lst_value) };
-			ASSERT(is_good(args) && is_good(body), "lambda");
-			return new Procedure(args, body, env);
-		}
-		if (is_if_special(lst_value)) {
-			auto condition { eval(if_condition(lst_value), env) };
-			ASSERT(is_good(condition), "if");
-			ASSERT(is_null(cddddr(lst_value)), "if");
-			if (is_true(condition)) {
-				return eval(if_consequence(lst_value), env);
-			} else {
-				return eval(if_alternative(lst_value), env);
+		auto lst_value { dynamic_cast<Pair *>(exp) };
+		if (lst_value) {
+			if (is_define_special(lst_value)) {
+				auto key { dynamic_cast<Symbol *>(define_key(lst_value)) };
+				auto value { define_value(lst_value, env) };
+				ASSERT(key && is_good(value), "define");
+				env->insert(key->value(), value);
+				return value;
 			}
-		}
-		if (is_cond_special(lst_value)) {
-			auto expr { build_cond(cdr(lst_value)) };
-			ASSERT(is_good(expr), "cond");
-			return eval(expr, env);
-		}
-		if (is_begin_special(lst_value)) {
-			Element *result { nullptr };
-			auto cur { cdr(lst_value) };
-			for (; is_good(cur) && cur; cur = cdr(cur)) {
-				result = eval(car(cur), env);
-				ASSERT(is_good(result), "begin");
+			if (is_lambda_special(lst_value)) {
+				auto args { lambda_args(lst_value) };
+				auto body { lambda_body(lst_value) };
+				ASSERT(is_good(args) && is_good(body), "lambda");
+				return new Procedure(args, body, env);
 			}
-			return result;
-		}
-		if (is_and_special(lst_value)) {
-			auto cur { cdr(lst_value) };
-			Element *result { one };
-			for (; is_good(cur) && cur; cur = cdr(cur)) {
-				result = eval(car(cur), env);
-				ASSERT(is_good(result), "and");
-				if (is_false(result)) { break; }
+			if (is_if_special(lst_value)) {
+				auto condition { eval(if_condition(lst_value), env) };
+				ASSERT(is_good(condition), "if");
+				ASSERT(is_null(cddddr(lst_value)), "if");
+				if (is_true(condition)) {
+					return eval(if_consequence(lst_value), env);
+				} else {
+					return eval(if_alternative(lst_value), env);
+				}
 			}
-			return result;
-		}
-		if (is_or_special(lst_value)) {
-			auto cur { cdr(lst_value) };
-			Element *result { nullptr };
-			for (; is_good(cur) && cur; cur = cdr(cur)) {
-				result = eval(car(cur), env);
-				ASSERT(is_good(result), "or");
-				if (is_true(result)) { break; }
+			if (is_cond_special(lst_value)) {
+				auto expr { build_cond(cdr(lst_value)) };
+				ASSERT(is_good(expr), "cond");
+				return eval(expr, env);
 			}
-			return result;
-		}
-		if (is_quote_special(lst_value)) {
-			return cdr(lst_value);
-		}
-		if (is_let_special(lst_value)) {
-			auto expr { build_let(lst_value) };
-			ASSERT(is_good(expr), "let");
-			return eval(expr, env);
-		}
-		if (is_set_special(lst_value)) {
-			ASSERT(is_valid_set(lst_value), "set!");
-			auto sym { dynamic_cast<Symbol *>(set_var(lst_value)) };
-			auto val { eval(set_value(lst_value), env) };
-			ASSERT(is_good(val), "set!");
-			return env->update(sym, val);
-		}
-		if (is_assert_special(lst_value)) {
-			ASSERT(is_valid_assert(lst_value), "assert");
-			auto val { eval(cadr(lst_value), env) };
-			if (is_false(val)) {
-				return err("assert", "failed", lst_value);
+			if (is_begin_special(lst_value)) {
+				auto cur { cdr(lst_value) };
+				for (; cdr(cur); cur = cdr(cur)) {
+					auto result { eval(car(cur), env) };
+					ASSERT(is_good(result), "begin");
+				}
+				
+				exp = car(cur);
+				continue;
 			}
-			return to_bool(true);
+			if (is_and_special(lst_value)) {
+				auto cur { cdr(lst_value) };
+				Element *result { one };
+				for (; is_good(cur) && cur; cur = cdr(cur)) {
+					result = eval(car(cur), env);
+					ASSERT(is_good(result), "and");
+					if (is_false(result)) { break; }
+				}
+				return result;
+			}
+			if (is_or_special(lst_value)) {
+				auto cur { cdr(lst_value) };
+				Element *result { nullptr };
+				for (; is_good(cur) && cur; cur = cdr(cur)) {
+					result = eval(car(cur), env);
+					ASSERT(is_good(result), "or");
+					if (is_true(result)) { break; }
+				}
+				return result;
+			}
+			if (is_quote_special(lst_value)) {
+				return cdr(lst_value);
+			}
+			if (is_let_special(lst_value)) {
+				auto expr { build_let(lst_value) };
+				ASSERT(is_good(expr), "let");
+				return eval(expr, env);
+			}
+			if (is_set_special(lst_value)) {
+				ASSERT(is_valid_set(lst_value), "set!");
+				auto sym { dynamic_cast<Symbol *>(set_var(lst_value)) };
+				auto val { eval(set_value(lst_value), env) };
+				ASSERT(is_good(val), "set!");
+				return env->update(sym, val);
+			}
+			if (is_assert_special(lst_value)) {
+				ASSERT(is_valid_assert(lst_value), "assert");
+				auto val { eval(cadr(lst_value), env) };
+				if (is_false(val)) {
+					return err("assert", "failed", lst_value);
+				}
+				return to_bool(true);
+			}
+			auto lst { eval_list(lst_value, env) };
+			return apply(car(lst), cdr(lst));
 		}
-		auto lst { eval_list(lst_value, env) };
-		return apply(car(lst), cdr(lst));
+		break;
 	}
 	ASSERT(false, "eval");
 }
