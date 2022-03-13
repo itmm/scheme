@@ -7,7 +7,13 @@ static int ch { ' ' };
 Element *read_expression(std::istream &in);
 
 void eat_space(std::istream &in) {
-	while (ch != EOF && ch <= ' ') { ch = in.get(); }
+	while (ch != EOF && (ch <= ' ' || ch == ';')) {
+		if (ch == ';') {
+			while (ch != EOF && ch != '\n') { ch = in.get(); }
+		} else {
+			ch = in.get();
+		}
+	}
 }
 
 Element *read_list(std::istream &in) {
@@ -47,10 +53,6 @@ Element *read_expression(std::istream &in) {
 			Symbol::get("quote"),
 			read_expression(in)
 		};
-	}
-	if (ch == ';') {
-		while (ch != EOF && ch != '\n') { ch = in.get(); }
-		return read_expression(in);
 	}
 	if (ch == '"') {
 		std::ostringstream result;

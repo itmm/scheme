@@ -249,13 +249,14 @@ Element *build_let(Element *lst) {
 	ASSERT(is_good(arg_vals) && is_good(block), "let");
 	auto args { build_let_args(arg_vals, nullptr) };
 	auto vals { build_let_vals(arg_vals, nullptr) };
-	return new Pair {
+	auto result { new Pair {
 		new Pair {
 			Symbol::get("lambda"),
 			new Pair { args, block }
 		},
 		vals
-	};
+	}};
+	return result;
 }
 
 bool is_set_special(Pair *lst) {
@@ -374,7 +375,6 @@ Element *eval(Element *exp, Frame *env) {
 				if (pair) {
 					if (is_tagged_list(pair, "car")) {
 						auto got { eval(cadr(pair), env) };
-						std::cerr << got << "\n";
 						auto res { dynamic_cast<Pair *>(got) };
 						ASSERT(res, "set! car");
 						res->set_head(val);
@@ -382,7 +382,6 @@ Element *eval(Element *exp, Frame *env) {
 					}
 					else if (is_tagged_list(pair, "cdr")) {
 						auto got { eval(cadr(pair), env) };
-						std::cerr << got << "\n";
 						auto res { dynamic_cast<Pair *>(got) };
 						ASSERT(res, "set! cdr");
 						res->set_rest(val);
