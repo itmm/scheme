@@ -629,6 +629,8 @@ class Pair : public Element {
 		Pair(Element *head, Element *rest): head_ { head }, rest_ { rest } { }
 		Element *head() const { return head_; }
 		Element *rest() const { return rest_; }
+		void set_head(Element *head) { head_ = head; }
+		void set_rest(Element *rest) { rest_ = rest; }
 		std::ostream &write(std::ostream &out) const override;
 };
 

@@ -266,8 +266,7 @@ Element *set_var(Element *lst) { return cadr(lst); }
 Element *set_value(Element *lst) { return caddr(lst); }
 
 bool is_valid_set(Pair *lst) {
-	return assert_sym(set_var(lst)) && is_good(set_value(lst)) &&
-		is_null(cdddr(lst));
+	return is_good(set_value(lst)) && is_null(cdddr(lst));
 }
 
 bool is_assert_special(Pair * lst) {
@@ -368,7 +367,29 @@ Element *eval(Element *exp, Frame *env) {
 				auto sym { dynamic_cast<Symbol *>(set_var(lst_value)) };
 				auto val { eval(set_value(lst_value), env) };
 				ASSERT(is_good(val), "set!");
-				return env->update(sym, val);
+				if (sym) {
+					return env->update(sym, val);
+				}
+				auto pair { dynamic_cast<Pair *>(set_var(lst_value)) };
+				if (pair) {
+					if (is_tagged_list(pair, "car")) {
+						auto got { eval(cadr(pair), env) };
+						std::cerr << got << "\n";
+						auto res { dynamic_cast<Pair *>(got) };
+						ASSERT(res, "set! car");
+						res->set_head(val);
+						return val;
+					}
+					else if (is_tagged_list(pair, "cdr")) {
+						auto got { eval(cadr(pair), env) };
+						std::cerr << got << "\n";
+						auto res { dynamic_cast<Pair *>(got) };
+						ASSERT(res, "set! cdr");
+						res->set_rest(val);
+						return val;
+					}
+				}
+				return err("set!", "unknown key", set_var(lst_value));
 			}
 			if (is_assert_special(lst_value)) {
 				ASSERT(is_valid_assert(lst_value), "assert");
