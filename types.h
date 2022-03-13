@@ -419,6 +419,7 @@ class Div_Propagate : public Propagate {
 };
 
 Element *div(Element *a, Element *b) {
+	if (is_zero(a)) { return zero; }
 	auto a_neg { is_negative(a) };
 	auto b_neg { is_negative(b) };
 	if (a_neg && b_neg) {

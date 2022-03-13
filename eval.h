@@ -28,6 +28,9 @@ class Procedure : public Element {
 			args_ { args }, body_ { body }, env_ { env }
 		{ }
 
+		Element *build_env(Element *arg_values);
+		Element *get_body();
+
 		Element *apply(Element *arg_values);
 		std::ostream &write(std::ostream &out) const override;
 };
@@ -53,34 +56,51 @@ Element *eval(Element *exp, Frame *env);
 std::vector<Frame *> active_frames;
 
 class Frame_Guard {
+		size_t init_size_;
+		void reset() {
+			while (active_frames.size() > init_size_) {
+				active_frames.pop_back();
+			}
+		}
 	public:
-		Frame_Guard(Frame *frame) { active_frames.push_back(frame); }
-		~Frame_Guard() { active_frames.pop_back(); }
+		Frame_Guard() : init_size_ { active_frames.size() } { }
+		Frame_Guard(Frame *frame) : Frame_Guard() { set(frame); }
+		void set(Frame *frame) { reset(); active_frames.push_back(frame); }
+		~Frame_Guard() { reset(); }
 };
 
-Element *Procedure::apply(Element *arg_values) {
+Element *Procedure::build_env(Element *arg_values) {
 	auto new_env { new Frame { env_ } };
-	Frame_Guard fg { new_env };
 
 	Element *cur { args_ };
-	ASSERT(is_good(cur), "procedure");
+	ASSERT(is_good(cur), "build_env");
 	for (; is_pair(cur); cur = cdr(cur)) {
 		auto sym { assert_sym(car(cur)) };
-		ASSERT(sym, "procedure");
+		ASSERT(sym, "build_env");
 		auto value { car(arg_values) };
-		ASSERT(is_good(value), "procedure");
+		ASSERT(is_good(value), "build_env");
 		new_env->insert(sym->value(), value);
 		arg_values = cdr(arg_values);
 	}
-	ASSERT(is_good(cur), "procedure");
+	ASSERT(is_good(cur), "build_env");
 	if (cur) {
 		auto sym { assert_sym(cur) };
-		ASSERT(sym, "procedure");
-		ASSERT(is_good(arg_values), "procedure");
+		ASSERT(sym, "build_env");
+		ASSERT(is_good(arg_values), "build_env");
 		new_env->insert(sym->value(), arg_values);
 	}
+	return new_env;
+}
 
-	return eval(new Pair { Symbol::get("begin"), body_ }, new_env);
+Element *Procedure::get_body() {
+	return new Pair { Symbol::get("begin"), body_ };
+}
+
+Element *Procedure::apply(Element *arg_values) {
+	auto new_env { dynamic_cast<Frame *>(build_env(arg_values)) };
+	ASSERT(new_env, "procedure apply");
+	Frame_Guard fg { new_env };
+	return eval(get_body(), new_env);
 }
 
 Element *apply(Element *op, Element *operands) {
@@ -259,6 +279,7 @@ bool is_valid_assert(Pair *lst) {
 }
 
 Element *eval(Element *exp, Frame *env) {
+	Frame_Guard frame_guard;
 	for (;;) {
 		if (is_err(exp) || ! exp) { return exp; }
 		auto int_value { dynamic_cast<Integer *>(exp) };
@@ -293,15 +314,17 @@ Element *eval(Element *exp, Frame *env) {
 				ASSERT(is_good(condition), "if");
 				ASSERT(is_null(cddddr(lst_value)), "if");
 				if (is_true(condition)) {
-					return eval(if_consequence(lst_value), env);
+					exp = if_consequence(lst_value);
+					continue;
 				} else {
-					return eval(if_alternative(lst_value), env);
+					exp = if_alternative(lst_value);
+					continue;
 				}
 			}
 			if (is_cond_special(lst_value)) {
-				auto expr { build_cond(cdr(lst_value)) };
-				ASSERT(is_good(expr), "cond");
-				return eval(expr, env);
+				exp = build_cond(cdr(lst_value));
+				ASSERT(is_good(exp), "cond");
+				continue;
 			}
 			if (is_begin_special(lst_value)) {
 				auto cur { cdr(lst_value) };
@@ -309,7 +332,6 @@ Element *eval(Element *exp, Frame *env) {
 					auto result { eval(car(cur), env) };
 					ASSERT(is_good(result), "begin");
 				}
-				
 				exp = car(cur);
 				continue;
 			}
@@ -337,9 +359,9 @@ Element *eval(Element *exp, Frame *env) {
 				return cdr(lst_value);
 			}
 			if (is_let_special(lst_value)) {
-				auto expr { build_let(lst_value) };
-				ASSERT(is_good(expr), "let");
-				return eval(expr, env);
+				exp = build_let(lst_value);
+				ASSERT(is_good(exp), "let");
+				continue;
 			}
 			if (is_set_special(lst_value)) {
 				ASSERT(is_valid_set(lst_value), "set!");
@@ -357,6 +379,15 @@ Element *eval(Element *exp, Frame *env) {
 				return to_bool(true);
 			}
 			auto lst { eval_list(lst_value, env) };
+			auto proc { dynamic_cast<Procedure *>(car(lst)) };
+			if (proc) {
+				auto new_env { dynamic_cast<Frame *>(proc->build_env(cdr(lst))) };
+				ASSERT(new_env, "eval apply");
+				frame_guard.set(new_env);
+				env = new_env;
+				exp = proc->get_body();
+				continue;
+			}
 			return apply(car(lst), cdr(lst));
 		}
 		break;
