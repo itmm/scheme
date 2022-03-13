@@ -396,7 +396,7 @@ Element *eval(Element *exp, Frame *env) {
 				if (is_false(val)) {
 					return err("assert", "failed", lst_value);
 				}
-				return to_bool(true);
+				return Symbol::get("ok");
 			}
 			auto lst { eval_list(lst_value, env) };
 			auto proc { dynamic_cast<Procedure *>(car(lst)) };
