@@ -667,7 +667,7 @@ bool is_pair(Element *elm) {
 
 bool is_complex(Element *elm) {
 	int i { 0 };
-	for (Element *cur { elm }; cur; cur = cdr(cur), ++i) {
+	for (Element *cur { elm }; is_pair(cur); cur = cdr(cur), ++i) {
 		auto val { car(cur) };
 		if (i > 4 || is_null(val) || is_pair(val)) { return true; }
 	}
