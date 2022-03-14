@@ -7,11 +7,11 @@
 class Primitive : public Element {
 	public:
 		virtual Element *apply(Element *args) = 0;
-		std::ostream &write(std::ostream &out) const override;
+		std::ostream &write(std::ostream &out) override;
 
 };
 
-std::ostream &Primitive::write(std::ostream &out) const {
+std::ostream &Primitive::write(std::ostream &out) {
 	return out << "#primitive";
 }
 
@@ -32,14 +32,17 @@ class Procedure : public Element {
 		Element *get_body();
 
 		Element *apply(Element *arg_values);
-		std::ostream &write(std::ostream &out) const override;
+		std::ostream &write(std::ostream &out) override;
 };
 
-std::ostream &Procedure::write(std::ostream &out) const {
+std::ostream &Procedure::write(std::ostream &out) {
 	out << "(lambda " << args_;
-	for (Element *cur { body_ }; cur; cur = cdr(cur)) {
-		auto v { car(cur) };
-		out << ' ' << v;
+	if (is_pair(body_)) {
+		out << "\n  ";
+		write_inner_complex_pair(out, dynamic_cast<Pair *>(body_), " ");
+	}
+	else {
+		out << " . " << body_;
 	}
 	out << ')';
 	return out;

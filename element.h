@@ -61,7 +61,7 @@ class Element {
 			all_elements = this;
 		}
 		virtual ~Element() { }
-		virtual std::ostream &write(std::ostream &out) const = 0;
+		virtual std::ostream &write(std::ostream &out) = 0;
 		static std::pair<unsigned, unsigned> garbage_collect();
 };
 

@@ -23,7 +23,7 @@ class Error : public Element {
 			raiser_ { raiser }, message_ { message },
 			data1_ { data1 }, data2_ { data2 }
 		{ }
-		std::ostream &write(std::ostream &out) const override {
+		std::ostream &write(std::ostream &out) override {
 			out << "(#error " << raiser_ << ": " << message_;
 			if (data1_) {
 				out << ": " << data1_;

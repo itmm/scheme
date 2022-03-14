@@ -18,7 +18,7 @@ class Frame : public Element {
 		bool has(const std::string &key) const;
 		Element *get(const std::string &key) const;
 		Element *update(Symbol *key, Element *value);
-		std::ostream &write(std::ostream &out) const override {
+		std::ostream &write(std::ostream &out) override {
 			return out << "#frame";
 		}
 };

@@ -10,7 +10,7 @@ class Value_Element : public Element {
 	public:
 		Value_Element(const VALUE_TYPE &value): value_ { value } { }
 		const VALUE_TYPE &value() const { return value_; }
-		std::ostream &write(std::ostream &out) const override {
+		std::ostream &write(std::ostream &out) override {
 			return out << value_;
 		}
 };
@@ -19,7 +19,7 @@ using Float = Value_Element<double>;
 class String : public Value_Element<std::string> {
 	public:
 		String(const std::string &value) : Value_Element(value) { }
-		std::ostream &write(std::ostream &out) const override {
+		std::ostream &write(std::ostream &out) override {
 			return out << '"' << value() << '"';
 		}
 };
@@ -44,7 +44,7 @@ class Symbol : public Element {
 			return sym;
 		}
 		const std::string &value() const { return value_; }
-		std::ostream &write(std::ostream &out) const override {
+		std::ostream &write(std::ostream &out) {
 			return out << value_;
 		}
 };
@@ -84,7 +84,7 @@ class Integer : public Element {
 		bool is_zero() const { return digits_.empty(); }
 		virtual bool is_negative() const { return false; }
 		Integer *negate() const;
-		std::ostream &write(std::ostream &out) const override {
+		std::ostream &write(std::ostream &out) override {
 			if (is_negative()) { out << '-'; }
 			if (digits_.empty()) { return out << '0'; }
 			bool first { true };
@@ -179,7 +179,7 @@ class Fraction : public Element {
 		static Element *create(Element *nom, Element *denum);
 		Integer *nom() const { return nom_; }
 		Integer *denum() const { return denum_; }
-		std::ostream &write(std::ostream &out) const override {
+		std::ostream &write(std::ostream &out) override {
 			return out << nom_ << '/' << denum_;
 		}
 		Fraction *negate() { return new Fraction { nom_->negate(), denum_ }; }
@@ -631,31 +631,8 @@ class Pair : public Element {
 		Element *rest() const { return rest_; }
 		void set_head(Element *head) { head_ = head; }
 		void set_rest(Element *rest) { rest_ = rest; }
-		std::ostream &write(std::ostream &out) const override;
+		std::ostream &write(std::ostream &out) override;
 };
-
-std::ostream &Pair::write(std::ostream &out) const {
-	auto sym { dynamic_cast<Symbol *>(head_) };
-	if (sym && sym->value() == "quote") {
-		out << "'";
-		return rest_->write(out);
-	}
-
-	out << '(';
-	bool first { true };
-	const Pair *cur { this };
-	while (cur) {
-		if (first) { first = false; } else { out << ' '; }
-		out << cur->head_;
-		auto nxt { dynamic_cast<Pair *>(cur->rest_) };
-		if (cur->rest_ && ! nxt) {
-			out << " . " << cur->rest_;
-		}
-		cur = nxt;
-	}
-	out << ')';
-	return out;
-}
 
 Element *car(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
@@ -688,3 +665,88 @@ bool is_null(Element *element) {
 bool is_pair(Element *elm) {
 	return dynamic_cast<Pair *>(elm);
 }
+
+bool is_complex(Element *elm) {
+	int i { 0 };
+	for (Element *cur { elm }; cur; cur = cdr(cur), ++i) {
+		auto val { car(cur) };
+		if (i > 4 || is_null(val) || is_pair(val)) { return true; }
+	}
+	return false;
+}
+
+void write_simple_pair(std::ostream &out, Pair *pair) {
+	out << '(';
+	bool first { true };
+	Pair *cur { pair };
+	while (cur) {
+		if (first) { first = false; } else { out << ' '; }
+		out << car(cur);
+		auto nxt { cdr(cur) };
+		auto nxt_pair { dynamic_cast<Pair *>(nxt) };
+		if (nxt && ! nxt_pair) {
+			out << " . " << nxt;
+		}
+		cur = nxt_pair;
+	}
+	out << ')';
+}
+
+void write_complex_pair(std::ostream &out, Pair *pair, std::string indent);
+
+void write_inner_complex_pair(std::ostream &out, Pair *pair, std::string indent) {
+	auto first { car(pair) };
+	out << first;
+	auto sym { dynamic_cast<Symbol *>(first) };
+	bool no_newline { false };
+	if (sym) {
+		for (unsigned i { 0 }; i <= sym->value().length(); ++i) {
+			indent += ' ';
+		}
+		no_newline = true;
+		out << ' ';
+	}
+	indent += ' ';
+	Element *cur { cdr(pair) };
+	while (is_pair(cur)) {
+		if (no_newline) {
+			no_newline = false;
+		} else {
+			out << '\n' << indent;
+		}
+		auto value { car(cur) };
+		auto val_pair { dynamic_cast<Pair *>(value) };
+		if (! value) { out << "()"; }
+		else if (val_pair) {
+			if (is_complex(val_pair)) {
+				write_complex_pair(out, val_pair, indent);
+			} else {
+				write_simple_pair(out, val_pair);
+			}
+		} else { out << value; }
+		cur = cdr(cur);
+	}
+	if (cur) {
+		out << " . " << cur;
+	}
+}
+
+void write_complex_pair(std::ostream &out, Pair *pair, std::string indent) {
+	out << '('; write_inner_complex_pair(out, pair,indent); out << ')';
+}
+
+std::ostream &Pair::write(std::ostream &out) {
+	auto sym { dynamic_cast<Symbol *>(head_) };
+	if (sym && sym->value() == "quote") {
+		out << "'";
+		return rest_->write(out);
+	}
+
+	if (is_complex(this)) {
+		write_complex_pair(out, this, "");
+	} else {
+		write_simple_pair(out, this);
+	}
+	return out;
+}
+
