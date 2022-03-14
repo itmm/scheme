@@ -25,7 +25,7 @@ class Procedure : public Element {
 		}
 	public:
 		Procedure(Element *args, Element *body, Frame *env):
-			args_ { args }, body_ { body }, env_ { env }
+			args_ { args }, body_ { new Pair { Symbol::get("list"), body }}, env_ { env }
 		{ }
 
 		Element *build_env(Element *arg_values);
@@ -37,12 +37,12 @@ class Procedure : public Element {
 
 std::ostream &Procedure::write(std::ostream &out) {
 	out << "(lambda " << args_;
-	if (is_pair(body_)) {
+	if (is_pair(cdr(body_))) {
 		out << "\n  ";
-		write_inner_complex_pair(out, dynamic_cast<Pair *>(body_), " ");
+		write_inner_complex_pair(out, dynamic_cast<Pair *>(cdr(body_)), " ");
 	}
 	else {
-		out << " . " << body_;
+		out << " . " << cdr(body_);
 	}
 	out << ')';
 	return out;
@@ -96,14 +96,18 @@ Element *Procedure::build_env(Element *arg_values) {
 }
 
 Element *Procedure::get_body() {
-	return new Pair { Symbol::get("begin"), body_ };
+	return body_;
 }
 
 Element *Procedure::apply(Element *arg_values) {
 	auto new_env { dynamic_cast<Frame *>(build_env(arg_values)) };
 	ASSERT(new_env, "procedure apply");
-	Frame_Guard fg { new_env };
-	return eval(get_body(), new_env);
+	Element *result;
+	{
+		Frame_Guard fg { new_env };
+		result = eval(get_body(), new_env);
+	}
+	return result;
 }
 
 Element *apply(Element *op, Element *operands) {
@@ -281,8 +285,23 @@ bool is_valid_assert(Pair *lst) {
 	return is_good(cadr(lst)) && is_null(cddr(lst));
 }
 
+class Active_Guard {
+		Element **elm_;
+	public:
+		Active_Guard(Element **elm) : elm_ { elm } {
+			if (*elm_) { (*elm_)->make_active(); };
+		}
+		~Active_Guard() { if (*elm_) { (*elm_)->cease_active(); } }
+		void swap(Element *el) {
+			if (el) { el->make_active(); }
+			if (*elm_) { (*elm_)->cease_active(); }
+			*elm_ = el;
+		}
+};
+
 Element *eval(Element *exp, Frame *env) {
 	Frame_Guard frame_guard;
+	Active_Guard exp_guard { &exp };
 	for (;;) {
 		if (is_err(exp) || ! exp) { return exp; }
 		auto int_value { dynamic_cast<Integer *>(exp) };
@@ -317,15 +336,15 @@ Element *eval(Element *exp, Frame *env) {
 				ASSERT(is_good(condition), "if");
 				ASSERT(is_null(cddddr(lst_value)), "if");
 				if (is_true(condition)) {
-					exp = if_consequence(lst_value);
+					exp_guard.swap(if_consequence(lst_value));
 					continue;
 				} else {
-					exp = if_alternative(lst_value);
+					exp_guard.swap(if_alternative(lst_value));
 					continue;
 				}
 			}
 			if (is_cond_special(lst_value)) {
-				exp = build_cond(cdr(lst_value));
+				exp_guard.swap(build_cond(cdr(lst_value)));
 				ASSERT(is_good(exp), "cond");
 				continue;
 			}
@@ -335,7 +354,7 @@ Element *eval(Element *exp, Frame *env) {
 					auto result { eval(car(cur), env) };
 					ASSERT(is_good(result), "begin");
 				}
-				exp = car(cur);
+				exp_guard.swap(car(cur));
 				continue;
 			}
 			if (is_and_special(lst_value)) {
@@ -362,7 +381,7 @@ Element *eval(Element *exp, Frame *env) {
 				return cdr(lst_value);
 			}
 			if (is_let_special(lst_value)) {
-				exp = build_let(lst_value);
+				exp_guard.swap(build_let(lst_value));
 				ASSERT(is_good(exp), "let");
 				continue;
 			}
@@ -408,7 +427,7 @@ Element *eval(Element *exp, Frame *env) {
 				ASSERT(new_env, "eval apply");
 				frame_guard.set(new_env);
 				env = new_env;
-				exp = proc->get_body();
+				exp_guard.swap(proc->get_body());
 				continue;
 			}
 			return apply(car(lst), cdr(lst));

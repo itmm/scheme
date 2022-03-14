@@ -20,7 +20,8 @@
   (if (null? lst)
 	start
 	(accumulate (op start (car lst))
-				op (cdr lst))))
+	            op
+		    (cdr lst))))
 (define (#mk-simple-numeric op init)
   (lambda args (accumulate init op args)))
 (define + (#mk-simple-numeric #binary+ 0))

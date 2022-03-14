@@ -51,7 +51,6 @@ class Symbol : public Element {
 
 std::map<std::string, Symbol *> Symbol::symbols_;
 
-#include <vector>
 #include <algorithm>
 
 class Integer : public Element {
@@ -716,8 +715,9 @@ void write_inner_complex_pair(std::ostream &out, Pair *pair, std::string indent)
 		}
 		auto value { car(cur) };
 		auto val_pair { dynamic_cast<Pair *>(value) };
-		if (! value) { out << "()"; }
-		else if (val_pair) {
+		if (! value) {
+			out << "()";
+		} else if (val_pair) {
 			if (is_complex(val_pair)) {
 				write_complex_pair(out, val_pair, indent);
 			} else {

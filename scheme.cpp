@@ -18,13 +18,13 @@
 std::ostream *prompt { nullptr };
 std::ostream *result { nullptr };
 
-void process_stream(std::istream &in) {
+void process_stream(std::istream &in, bool with_header) {
 	active_frames.clear();
 	active_frames.push_back(&initial_frame);
 
 	if (prompt) { *prompt << "? "; }
 	ch = in.get();
-	if (ch == '#') {
+	if (with_header && ch == '#') {
 		while (ch != EOF && ch != '\n') { ch = in.get(); }
 	}
 	for (;;) {
@@ -41,7 +41,7 @@ void process_stdin() {
 	auto old_result { result };
 	prompt = &std::cout;
 	result = &std::cout;
-	process_stream(std::cin);
+	process_stream(std::cin, false);
 	result = old_result;
 	prompt = old_prompt;
 }
@@ -62,7 +62,7 @@ int main(int argc, const char *argv[]) {
 		std::istringstream s { 
 			#include "scheme.scm.h"
 		};
-		process_stream(s);
+		process_stream(s, true);
 	}
 
 	if (argc > 1) {
@@ -76,7 +76,7 @@ int main(int argc, const char *argv[]) {
 				std::ifstream in { argv[i] };
 				auto old_result { result };
 				result = &std::cout;
-				process_stream(in);
+				process_stream(in, true);
 				result = old_result;
 			}
 		}

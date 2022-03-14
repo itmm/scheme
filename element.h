@@ -7,12 +7,15 @@
  */
 
 #include <iostream>
+#include <vector>
+#include <algorithm>
 
 class Element {
 		Element *next_;
 
 		static Element *all_elements;
 		static bool current_mark;
+		static std::vector<Element *> active_elements;
 
 		bool get_mark() {
 			return static_cast<bool>(reinterpret_cast<size_t>(next_) & 0x1);
@@ -63,6 +66,11 @@ class Element {
 		virtual ~Element() { }
 		virtual std::ostream &write(std::ostream &out) = 0;
 		static std::pair<unsigned, unsigned> garbage_collect();
+
+		void make_active() { active_elements.push_back(this); }
+		void cease_active() {
+			active_elements.erase(find(active_elements.begin(), active_elements.end(), this));
+		}
 };
 
 inline std::ostream &operator<<(std::ostream &out, Element *elm) {

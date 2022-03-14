@@ -4,10 +4,12 @@
 
 Element *Element::all_elements { nullptr };
 bool Element::current_mark { true };
+std::vector<Element *> Element::active_elements;
 
 std::pair<unsigned, unsigned> Element::garbage_collect() {
 	current_mark = ! current_mark;
 	for (auto &f : active_frames) { f->mark(); }
+	for (auto &e : active_elements) { e->mark(); }
 
 	unsigned kept { 0 };
 	unsigned collected { 0 };
