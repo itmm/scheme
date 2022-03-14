@@ -25,7 +25,7 @@ class Procedure : public Element {
 		}
 	public:
 		Procedure(Element *args, Element *body, Frame *env):
-			args_ { args }, body_ { new Pair { Symbol::get("list"), body }}, env_ { env }
+			args_ { args }, body_ { new Pair { Symbol::get("begin"), body }}, env_ { env }
 		{ }
 
 		Element *build_env(Element *arg_values);
