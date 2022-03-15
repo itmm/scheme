@@ -1,6 +1,9 @@
-.PHONY: clean lines
+.PHONY: tests clean lines
 
 CXXFLAGS += -g -Wall
+
+tests: scheme
+	./tests.scm
 
 scheme:
 
