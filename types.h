@@ -635,14 +635,14 @@ class Pair : public Element {
 
 Element *car(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
-	ASSERT(pair || !lst, "car");
-	return pair ? pair->head() : nullptr;
+	ASSERT(pair, "car");
+	return pair->head();
 }
 
 Element *cdr(Element *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
-	ASSERT(pair || !lst, "cdr");
-	return pair ? pair->rest() : nullptr;
+	ASSERT(pair, "cdr");
+	return pair->rest();
 }
 
 Element *cadr(Element *lst) { return car(cdr(lst)); }

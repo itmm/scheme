@@ -9,6 +9,7 @@
 "  (cdr (cddr l)))\n"
 "(define #t 1)\n"
 "(define #f nil)\n"
+"(define (list . l) l)\n"
 "(define true #t)\n"
 "(define false #f)\n"
 "(define (> a b)\n"

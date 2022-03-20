@@ -24,15 +24,6 @@ class Cdr_Primitive : public One_Primitive {
 		Element *apply_one(Element *arg) override { return cdr(arg); }
 };
 
-class List_Primitive : public Primitive {
-	public:
-		Element *apply(Element *args) override;
-};
-
-Element *List_Primitive::apply(Element *args) {
-	return args;
-}
-
 class Two_Primitive : public Primitive {
 	protected:
 		virtual Element *apply_two(Element *first, Element *second) = 0;
@@ -197,7 +188,6 @@ Frame initial_frame { nullptr };
 void setup_primitives() {
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
-	initial_frame.insert("list", new List_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("#binary+", new Add_Primitive());
 	initial_frame.insert("#binary-", new Sub_Primitive());

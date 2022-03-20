@@ -9,6 +9,7 @@
   (cdr (cddr l)))
 (define #t 1)
 (define #f nil)
+(define (list . l) l)
 (define true #t)
 (define false #f)
 (define (> a b)
