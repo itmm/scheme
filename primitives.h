@@ -24,6 +24,11 @@ class Cdr_Primitive : public One_Primitive {
 		Obj *apply_one(Obj *arg) override { return cdr(arg); }
 };
 
+class Null_Primitive : public One_Primitive {
+	protected:
+		Obj *apply_one(Obj *arg) override { return to_bool(is_null(arg)); }
+};
+
 class Two_Primitive : public Primitive {
 	protected:
 		virtual Obj *apply_two(Obj *first, Obj *second) = 0;
@@ -189,6 +194,7 @@ void setup_primitives() {
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
+	initial_frame.insert("null?", new Null_Primitive());
 	initial_frame.insert("#binary+", new Add_Primitive());
 	initial_frame.insert("#binary-", new Sub_Primitive());
 	initial_frame.insert("#binary*", new Mul_Primitive());

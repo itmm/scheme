@@ -532,7 +532,7 @@ Integer *div_int(Integer *a, Integer *b) {
 
 	for (;;) {
 		auto prod { mult(max, b) };
-		if (is_equal_num(prod, a)) { return dynamic_cast<Integer *>(max); }
+		if (is_true(is_equal_num(prod, a))) { return dynamic_cast<Integer *>(max); }
 		if (is_false(less(prod, a))) { break; }
 		max = mult(max, max);
 	}
@@ -603,18 +603,28 @@ Obj *Fraction::create(Obj *nom, Obj *denum) {
 	return new Fraction { ni, di };
 }
 
+class False : public Obj {
+	public:
+		False() {}
+		std::ostream &write(std::ostream &out) override {
+			return out << "#f";
+		}
+};
+
+False *false_obj = new False {};
+
 Obj *to_bool(bool cond) {
-	return cond ?  one : nullptr;
+	return cond ?  one : false_obj;
 }
 
 bool is_true(Obj *value) {
 	if (is_err(value)) { err("is_true", "no value"); }
-	return is_good(value) && value;
+	return is_good(value) && value != false_obj;
 }
 
 bool is_false(Obj *value) {
 	if (is_err(value)) { err("is_false", "no value"); }
-	return ! value;
+	return value == false_obj;
 }
 
 class Pair : public Obj {

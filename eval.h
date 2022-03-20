@@ -362,7 +362,7 @@ Obj *eval(Obj *exp, Frame *env) {
 			if (is_and_special(lst_value)) {
 				auto cur { cdr(lst_value) };
 				Obj *result { one };
-				for (; is_good(cur) && cur; cur = cdr(cur)) {
+				for (; is_true(cur) && cur; cur = cdr(cur)) {
 					result = eval(car(cur), env);
 					ASSERT(is_good(result), "and");
 					if (is_false(result)) { break; }
@@ -371,7 +371,7 @@ Obj *eval(Obj *exp, Frame *env) {
 			}
 			if (is_or_special(lst_value)) {
 				auto cur { cdr(lst_value) };
-				Obj *result { nullptr };
+				Obj *result { false_obj };
 				for (; is_good(cur) && cur; cur = cdr(cur)) {
 					result = eval(car(cur), env);
 					ASSERT(is_good(result), "or");

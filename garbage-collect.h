@@ -17,7 +17,7 @@ std::pair<unsigned, unsigned> Obj::garbage_collect() {
 	Obj *cur { all_elements };
 	while (cur) {
 		auto mark { cur->get_mark() };
-		if (cur != one && cur != zero && cur != two && mark != current_mark) {
+		if (cur != one && cur != zero && cur != two && cur != false_obj && mark != current_mark) {
 			++collected;
 			auto tmp { remove_mark(cur->next_, mark) };
 			delete cur;
