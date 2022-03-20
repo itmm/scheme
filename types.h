@@ -739,7 +739,7 @@ std::ostream &Pair::write(std::ostream &out) {
 	auto sym { dynamic_cast<Symbol *>(head_) };
 	if (sym && sym->value() == "quote") {
 		out << "'";
-		return rest_->write(out);
+		return car(rest_)->write(out);
 	}
 
 	if (is_complex(this)) {

@@ -51,7 +51,7 @@ Element *read_expression(std::istream &in) {
 		ch = in.get();
 		return new Pair {
 			Symbol::get("quote"),
-			read_expression(in)
+			new Pair { read_expression(in), nullptr }
 		};
 	}
 	if (ch == '"') {

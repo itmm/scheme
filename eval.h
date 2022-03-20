@@ -380,7 +380,7 @@ Element *eval(Element *exp, Frame *env) {
 				return result;
 			}
 			if (is_quote_special(lst_value)) {
-				return cdr(lst_value);
+				return cadr(lst_value);
 			}
 			if (is_let_special(lst_value)) {
 				exp_guard.swap(build_let(lst_value));
