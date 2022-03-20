@@ -5,7 +5,7 @@
  */
 
 template<typename VALUE_TYPE>
-class Value_Element : public Element {
+class Value_Element : public Obj {
 		VALUE_TYPE value_;
 	public:
 		Value_Element(const VALUE_TYPE &value): value_ { value } { }
@@ -26,7 +26,7 @@ class String : public Value_Element<std::string> {
 
 #include <map>
 
-class Symbol : public Element {
+class Symbol : public Obj {
 		static std::map<std::string, Symbol *>symbols_;
 		std::string value_;
 		Symbol(const std::string &value): value_ { value } { }
@@ -53,7 +53,7 @@ std::map<std::string, Symbol *> Symbol::symbols_;
 
 #include <algorithm>
 
-class Integer : public Element {
+class Integer : public Obj {
 	public:
 		using Digits = std::vector<unsigned short>;
 	private:
@@ -70,8 +70,8 @@ class Integer : public Element {
 		Integer(Digits &&digits): digits_ { std::move(digits) } {
 			normalize();
 		}
-		static Element *create(const std::string &digits);
-		static Element *create(unsigned value);
+		static Obj *create(const std::string &digits);
+		static Obj *create(unsigned value);
 		const Digits &digits() const { return digits_; }
 		double float_value() const { 
 			double result { 0.0 };
@@ -129,7 +129,7 @@ Integer *Integer::negate() const {
 	}
 }
 
-Element *Integer::create(const std::string &digits) {
+Obj *Integer::create(const std::string &digits) {
 	Integer::Digits result;
 	bool negative { false };
 	unsigned short v { 0 };
@@ -156,7 +156,7 @@ Element *Integer::create(const std::string &digits) {
 	}
 }
 
-Element *Integer::create(unsigned value) {
+Obj *Integer::create(unsigned value) {
 	Integer::Digits result;
 	for (; value; value /= 10000) {
 		result.push_back(value % 10000);
@@ -168,14 +168,14 @@ auto one { Integer::create(1) };
 auto two { Integer::create(2) };
 auto zero { Integer::create(0) };
 
-class Fraction : public Element {
+class Fraction : public Obj {
 		Integer *nom_;
 		Integer *denum_;
 		Fraction(Integer *nom, Integer *denum): nom_ { nom }, denum_ { denum } { }
 
 	public:
 		static Fraction *create_forced(Integer *nom, Integer *denum);
-		static Element *create(Element *nom, Element *denum);
+		static Obj *create(Obj *nom, Obj *denum);
 		Integer *nom() const { return nom_; }
 		Integer *denum() const { return denum_; }
 		std::ostream &write(std::ostream &out) override {
@@ -184,7 +184,7 @@ class Fraction : public Element {
 		Fraction *negate() { return new Fraction { nom_->negate(), denum_ }; }
 };
 
-Element *negate(Element *a) {
+Obj *negate(Obj *a) {
 	auto ai { dynamic_cast<Integer *>(a) };
 	if (ai) {
 		return ai->negate();
@@ -200,7 +200,7 @@ Element *negate(Element *a) {
 	ASSERT(false, "negate");
 }
 
-bool is_negative(Element *a) {
+bool is_negative(Obj *a) {
 	auto ai { dynamic_cast<Integer *>(a) };
 	if (ai) { return ai->is_negative(); };
 	auto afr { dynamic_cast<Fraction *>(a) };
@@ -211,7 +211,7 @@ bool is_negative(Element *a) {
 	return false;
 }
 
-bool is_zero(Element *a) {
+bool is_zero(Obj *a) {
 	auto ai { dynamic_cast<Integer *>(a) };
 	if (ai) { return ai->is_zero(); };
 	auto afr { dynamic_cast<Fraction *>(a) };
@@ -224,14 +224,14 @@ bool is_zero(Element *a) {
 
 class Propagate {
 	protected:
-		virtual Element *apply_int(Integer *a, Integer *b) = 0;
-		virtual Element *apply_fract(Fraction *a, Fraction *b) = 0;
-		virtual Element *apply_float(Float *a, Float *b) = 0;
+		virtual Obj *apply_int(Integer *a, Integer *b) = 0;
+		virtual Obj *apply_fract(Fraction *a, Fraction *b) = 0;
+		virtual Obj *apply_float(Float *a, Float *b) = 0;
 	public:
-		Element *propagate(Element *a, Element *b);
+		Obj *propagate(Obj *a, Obj *b);
 };
 
-Element *Propagate::propagate(Element *a, Element *b) {
+Obj *Propagate::propagate(Obj *a, Obj *b) {
 	auto ai { dynamic_cast<Integer *>(a) };
 	auto bi { dynamic_cast<Integer *>(b) };
 	if (ai && bi) { return apply_int(ai, bi); }
@@ -259,14 +259,14 @@ Element *Propagate::propagate(Element *a, Element *b) {
 	return err("propagate", "can't propagate", a, b);
 }
 
-Element *add(Element *a, Element *b);
-Element *mult(Element *a, Element *b);
-Element *sub(Element *a, Element *b);
-Element *div(Element *a, Element *b);
+Obj *add(Obj *a, Obj *b);
+Obj *mult(Obj *a, Obj *b);
+Obj *sub(Obj *a, Obj *b);
+Obj *div(Obj *a, Obj *b);
 
 class Add_Propagate : public Propagate {
 	protected:
-		Element *apply_int(Integer *a, Integer *b) {
+		Obj *apply_int(Integer *a, Integer *b) {
 			Integer::Digits digits;
 			auto a_i { a->digits().begin() };
 			auto b_i { b->digits().begin() };
@@ -282,18 +282,18 @@ class Add_Propagate : public Propagate {
 
 			return new Integer { std::move(digits) };
 		}
-		Element *apply_fract(Fraction *a, Fraction *b) {
+		Obj *apply_fract(Fraction *a, Fraction *b) {
 			return Fraction::create(
 				add(mult(a->nom(), b->denum()), mult(b->nom(), a->denum())),
 				mult(a->denum(), b->denum())
 			);
 		}
-		Element *apply_float(Float *a, Float *b) {
+		Obj *apply_float(Float *a, Float *b) {
 			return new Float { a->value() + b->value() };
 		}
 };
 
-Element *add(Element *a, Element *b) {
+Obj *add(Obj *a, Obj *b) {
 	auto a_neg { is_negative(a) };
 	auto b_neg { is_negative(b) };
 	if (! a_neg && b_neg) {
@@ -308,7 +308,7 @@ Element *add(Element *a, Element *b) {
 
 class Sub_Propagate : public Propagate {
 	protected:
-		Element *apply_int(Integer *a, Integer *b) {
+		Obj *apply_int(Integer *a, Integer *b) {
 			Integer::Digits digits;
 			auto a_i { a->digits().begin() };
 			auto b_i { b->digits().begin() };
@@ -322,24 +322,24 @@ class Sub_Propagate : public Propagate {
 			}
 			return new Integer { std::move(digits) };
 		}
-		Element *apply_fract(Fraction *a, Fraction *b) {
+		Obj *apply_fract(Fraction *a, Fraction *b) {
 			return Fraction::create(
 				sub(mult(a->nom(), b->denum()), mult(b->nom(), a->denum())),
 				mult(a->denum(), b->denum())
 			);
 		}
-		Element *apply_float(Float *a, Float *b) {
+		Obj *apply_float(Float *a, Float *b) {
 			return new Float { a->value() - b->value() };
 		}
 };
 
-Element *to_bool(bool cond);
-bool is_true(Element *value);
-bool is_false(Element *value);
+Obj *to_bool(bool cond);
+bool is_true(Obj *value);
+bool is_false(Obj *value);
 
-Element *less(Element *a, Element *b);
+Obj *less(Obj *a, Obj *b);
 
-Element *sub(Element *a, Element *b) {
+Obj *sub(Obj *a, Obj *b) {
 	auto a_neg { is_negative(a) };
 	auto b_neg { is_negative(b) };
 	if (! a_neg && b_neg) {
@@ -357,7 +357,7 @@ Element *sub(Element *a, Element *b) {
 
 class Mul_Propagate : public Propagate {
 	protected:
-		Element *apply_int(Integer *a, Integer *b) {
+		Obj *apply_int(Integer *a, Integer *b) {
 			Integer::Digits digits;
 			auto a_i { a->digits().begin() };
 			unsigned offset { 0 };
@@ -378,17 +378,17 @@ class Mul_Propagate : public Propagate {
 
 			return new Integer { std::move(digits) };
 		}
-		Element *apply_fract(Fraction *a, Fraction *b) {
+		Obj *apply_fract(Fraction *a, Fraction *b) {
 			return Fraction::create(
 				mult(a->nom(), b->nom()), mult(a->denum(), b->denum())
 			);
 		}
-		Element *apply_float(Float *a, Float *b) {
+		Obj *apply_float(Float *a, Float *b) {
 			return new Float { a->value() * b->value() };
 		}
 };
 
-Element *mult(Element *a, Element *b) {
+Obj *mult(Obj *a, Obj *b) {
 	auto a_neg { is_negative(a) };
 	auto b_neg { is_negative(b) };
 	if (a_neg && b_neg) {
@@ -404,20 +404,20 @@ Element *mult(Element *a, Element *b) {
 
 class Div_Propagate : public Propagate {
 	protected:
-		Element *apply_int(Integer *a, Integer *b) {
+		Obj *apply_int(Integer *a, Integer *b) {
 			return Fraction::create(a, b);
 		}
-		Element *apply_fract(Fraction *a, Fraction *b) {
+		Obj *apply_fract(Fraction *a, Fraction *b) {
 			return Fraction::create(
 				mult(a->nom(), b->denum()), mult(a->denum(), b->nom())
 			);
 		}
-		Element *apply_float(Float *a, Float *b) {
+		Obj *apply_float(Float *a, Float *b) {
 			return new Float { a->value() / b->value() };
 		}
 };
 
-Element *div(Element *a, Element *b) {
+Obj *div(Obj *a, Obj *b) {
 	if (is_zero(a)) { return zero; }
 	auto a_neg { is_negative(a) };
 	auto b_neg { is_negative(b) };
@@ -436,7 +436,7 @@ Element *div(Element *a, Element *b) {
 
 class Less_Propagate : public Propagate {
 	protected:
-		Element *apply_int(Integer *a, Integer *b) {
+		Obj *apply_int(Integer *a, Integer *b) {
 			if (a->digits().size() > b->digits().size()) { return to_bool(false); }
 			if (a->digits().size() < b->digits().size()) { return to_bool(true); }
 
@@ -448,15 +448,15 @@ class Less_Propagate : public Propagate {
 			}
 			return to_bool(false);
 		}
-		Element *apply_fract(Fraction *a, Fraction *b) {
+		Obj *apply_fract(Fraction *a, Fraction *b) {
 			return less(mult(a->nom(), b->denum()), mult(b->nom(), a->denum()));
 		}
-		Element *apply_float(Float *a, Float *b) {
+		Obj *apply_float(Float *a, Float *b) {
 			return to_bool(a->value() < b->value());
 		}
 };
 
-Element *less(Element *a, Element *b) {
+Obj *less(Obj *a, Obj *b) {
 	auto a_neg { is_negative(a) };
 	auto b_neg { is_negative(b) };
 	if (a_neg && b_neg) {
@@ -470,11 +470,11 @@ Element *less(Element *a, Element *b) {
 	return Less_Propagate{}.propagate(a, b);
 }
 
-Element *is_equal_num(Element *a, Element *b);
+Obj *is_equal_num(Obj *a, Obj *b);
 
 class Equal_Propagate : public Propagate {
 	protected:
-		Element *apply_int(Integer *a, Integer *b) {
+		Obj *apply_int(Integer *a, Integer *b) {
 			if (a->digits().size() != b->digits().size()) {
 				return to_bool(false);
 			}
@@ -485,15 +485,15 @@ class Equal_Propagate : public Propagate {
 			}
 			return to_bool(true);
 		}
-		Element *apply_fract(Fraction *a, Fraction *b) {
+		Obj *apply_fract(Fraction *a, Fraction *b) {
 			return is_equal_num(mult(a->nom(), b->denum()), mult(b->nom(), a->denum()));
 		}
-		Element *apply_float(Float *a, Float *b) {
+		Obj *apply_float(Float *a, Float *b) {
 			return to_bool(a->value() == b->value());
 		}
 };
 
-Element *is_equal_num(Element *a, Element *b) {
+Obj *is_equal_num(Obj *a, Obj *b) {
 	if (is_zero(a) && is_zero(b)) { return to_bool(true); }
 	if (is_negative(a) != is_negative(b)) { return to_bool(false); }
 
@@ -501,7 +501,7 @@ Element *is_equal_num(Element *a, Element *b) {
 
 }
 
-static Element *half(Element *num) {
+static Obj *half(Obj *num) {
 	auto in { dynamic_cast<Integer *>(num) };
 	ASSERT(in, "half");
 	Integer::Digits result;
@@ -515,7 +515,7 @@ static Element *half(Element *num) {
 	return new Integer { std::move(result) };
 }
 
-bool is_int(Element *a) {
+bool is_int(Obj *a) {
 	return dynamic_cast<Integer *>(a);
 }
 
@@ -527,8 +527,8 @@ Integer *div_int(Integer *a, Integer *b) {
 		return res ? res->negate() : nullptr;
 	}
 
-	Element *min { one };
-	Element *max { two };
+	Obj *min { one };
+	Obj *max { two };
 
 	for (;;) {
 		auto prod { mult(max, b) };
@@ -549,7 +549,7 @@ Integer *div_int(Integer *a, Integer *b) {
 	return dynamic_cast<Integer *>(min);
 }
 
-Element *remainder(Element *a, Element *b) {
+Obj *remainder(Obj *a, Obj *b) {
 	ASSERT(is_int(a) && is_int(b), "remainder");
 	if (is_true(is_equal_num(b, one))) { return zero; }
 	if (is_true(less(a, b))) { return a; }
@@ -557,7 +557,7 @@ Element *remainder(Element *a, Element *b) {
 	return sub(a, mult(div_int(dynamic_cast<Integer *>(a), dynamic_cast<Integer *>(b)), b));
 }
 
-Element *gcd(Element *a, Element *b) {
+Obj *gcd(Obj *a, Obj *b) {
 	if (is_zero(b)) { return a; }
 	return gcd(b, remainder(a, b));
 }
@@ -580,7 +580,7 @@ Fraction *Fraction::create_forced(Integer *nom, Integer *denum) {
 	return new Fraction { nom, denum };
 }
 
-Element *Fraction::create(Element *nom, Element *denum) {
+Obj *Fraction::create(Obj *nom, Obj *denum) {
 	if (is_negative(denum)) {
 		return create(::negate(nom), ::negate(denum));
 	}
@@ -603,71 +603,71 @@ Element *Fraction::create(Element *nom, Element *denum) {
 	return new Fraction { ni, di };
 }
 
-Element *to_bool(bool cond) {
+Obj *to_bool(bool cond) {
 	return cond ?  one : nullptr;
 }
 
-bool is_true(Element *value) {
+bool is_true(Obj *value) {
 	if (is_err(value)) { err("is_true", "no value"); }
 	return is_good(value) && value;
 }
 
-bool is_false(Element *value) {
+bool is_false(Obj *value) {
 	if (is_err(value)) { err("is_false", "no value"); }
 	return ! value;
 }
 
-class Pair : public Element {
-		Element *head_;
-		Element *rest_;
+class Pair : public Obj {
+		Obj *head_;
+		Obj *rest_;
 	protected:
 		void propagate_mark() override {
 			mark(head_); mark(rest_);
 		}
 	public:
-		Pair(Element *head, Element *rest): head_ { head }, rest_ { rest } { }
-		Element *head() const { return head_; }
-		Element *rest() const { return rest_; }
-		void set_head(Element *head) { head_ = head; }
-		void set_rest(Element *rest) { rest_ = rest; }
+		Pair(Obj *head, Obj *rest): head_ { head }, rest_ { rest } { }
+		Obj *head() const { return head_; }
+		Obj *rest() const { return rest_; }
+		void set_head(Obj *head) { head_ = head; }
+		void set_rest(Obj *rest) { rest_ = rest; }
 		std::ostream &write(std::ostream &out) override;
 };
 
-Element *car(Element *lst) {
+Obj *car(Obj *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
 	ASSERT(pair, "car");
 	return pair->head();
 }
 
-Element *cdr(Element *lst) {
+Obj *cdr(Obj *lst) {
 	auto pair { dynamic_cast<Pair *>(lst) };
 	ASSERT(pair, "cdr");
 	return pair->rest();
 }
 
-Element *cadr(Element *lst) { return car(cdr(lst)); }
+Obj *cadr(Obj *lst) { return car(cdr(lst)); }
 
-Element *cddr(Element *lst) { return cdr(cdr(lst)); }
+Obj *cddr(Obj *lst) { return cdr(cdr(lst)); }
 
-Element *caddr(Element *lst) { return car(cddr(lst)); }
+Obj *caddr(Obj *lst) { return car(cddr(lst)); }
 
-Element *cdddr(Element *lst) { return cdr(cddr(lst)); }
+Obj *cdddr(Obj *lst) { return cdr(cddr(lst)); }
 
-Element *cadddr(Element *lst) { return car(cdddr(lst)); }
+Obj *cadddr(Obj *lst) { return car(cdddr(lst)); }
 
-Element *cddddr(Element *lst) { return cdr(cdddr(lst)); }
+Obj *cddddr(Obj *lst) { return cdr(cdddr(lst)); }
 
-bool is_null(Element *element) {
+bool is_null(Obj *element) {
 	return ! element;
 }
 
-bool is_pair(Element *elm) {
+bool is_pair(Obj *elm) {
 	return dynamic_cast<Pair *>(elm);
 }
 
-bool is_complex(Element *elm) {
+bool is_complex(Obj *elm) {
 	int i { 0 };
-	for (Element *cur { elm }; is_pair(cur); cur = cdr(cur), ++i) {
+	for (Obj *cur { elm }; is_pair(cur); cur = cdr(cur), ++i) {
 		auto val { car(cur) };
 		if (i > 4 || is_null(val) || is_pair(val)) { return true; }
 	}
@@ -706,7 +706,7 @@ void write_inner_complex_pair(std::ostream &out, Pair *pair, std::string indent)
 		out << ' ';
 	}
 	indent += ' ';
-	Element *cur { cdr(pair) };
+	Obj *cur { cdr(pair) };
 	while (is_pair(cur)) {
 		if (no_newline) {
 			no_newline = false;

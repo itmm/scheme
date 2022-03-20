@@ -2,19 +2,19 @@
  * implementation of the garbage collection
  */
 
-Element *Element::all_elements { nullptr };
-bool Element::current_mark { true };
-std::vector<Element *> Element::active_elements;
+Obj *Obj::all_elements { nullptr };
+bool Obj::current_mark { true };
+std::vector<Obj *> Obj::active_elements;
 
-std::pair<unsigned, unsigned> Element::garbage_collect() {
+std::pair<unsigned, unsigned> Obj::garbage_collect() {
 	current_mark = ! current_mark;
 	for (auto &f : active_frames) { f->mark(); }
 	for (auto &e : active_elements) { e->mark(); }
 
 	unsigned kept { 0 };
 	unsigned collected { 0 };
-	Element *prev { nullptr };
-	Element *cur { all_elements };
+	Obj *prev { nullptr };
+	Obj *cur { all_elements };
 	while (cur) {
 		auto mark { cur->get_mark() };
 		if (cur != one && cur != zero && cur != two && mark != current_mark) {

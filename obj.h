@@ -10,12 +10,12 @@
 #include <vector>
 #include <algorithm>
 
-class Element {
-		Element *next_;
+class Obj {
+		Obj *next_;
 
-		static Element *all_elements;
+		static Obj *all_elements;
 		static bool current_mark;
-		static std::vector<Element *> active_elements;
+		static std::vector<Obj *> active_elements;
 
 		bool get_mark() {
 			return static_cast<bool>(reinterpret_cast<size_t>(next_) & 0x1);
@@ -26,23 +26,23 @@ class Element {
 		}
 
 		void toggle_mark() {
-			next_ = reinterpret_cast<Element *>(
+			next_ = reinterpret_cast<Obj *>(
 				reinterpret_cast<size_t>(next_) ^ 0x1
 			);
 		}
 
-		static Element *add_mark(Element *ptr, bool mark) {
-			return reinterpret_cast<Element *>(
+		static Obj *add_mark(Obj *ptr, bool mark) {
+			return reinterpret_cast<Obj *>(
 				reinterpret_cast<size_t>(ptr) | static_cast<size_t>(mark)
 			);
 		}
 
-		static Element *add_current_mark(Element *ptr) {
+		static Obj *add_current_mark(Obj *ptr) {
 			return add_mark(ptr, current_mark);
 		}
 
-		static Element *remove_mark(Element *marked, bool mark) {
-			return reinterpret_cast<Element *>(
+		static Obj *remove_mark(Obj *marked, bool mark) {
+			return reinterpret_cast<Obj *>(
 				reinterpret_cast<size_t>(marked) ^ static_cast<size_t>(mark)
 			);
 		}
@@ -57,13 +57,13 @@ class Element {
 	protected:
 		virtual void propagate_mark() { }
 			
-		void mark(Element *elm) { if (elm) { elm->mark(); } }
+		void mark(Obj *elm) { if (elm) { elm->mark(); } }
 
 	public:
-		Element(): next_ { add_current_mark(all_elements) } {
+		Obj(): next_ { add_current_mark(all_elements) } {
 			all_elements = this;
 		}
-		virtual ~Element() { }
+		virtual ~Obj() { }
 		virtual std::ostream &write(std::ostream &out) = 0;
 		static std::pair<unsigned, unsigned> garbage_collect();
 
@@ -73,7 +73,9 @@ class Element {
 		}
 };
 
-inline std::ostream &operator<<(std::ostream &out, Element *elm) {
+using Element = Obj;
+
+inline std::ostream &operator<<(std::ostream &out, Obj *elm) {
 	if (elm) {
 		return elm->write(out);
 	} else {

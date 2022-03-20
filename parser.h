@@ -4,7 +4,7 @@
 
 static int ch { ' ' };
 
-Element *read_expression(std::istream &in);
+Obj *read_expression(std::istream &in);
 
 void eat_space(std::istream &in) {
 	while (ch != EOF && (ch <= ' ' || ch == ';')) {
@@ -16,7 +16,7 @@ void eat_space(std::istream &in) {
 	}
 }
 
-Element *read_list(std::istream &in, int closing) {
+Obj *read_list(std::istream &in, int closing) {
 	eat_space(in);
 	if (ch == EOF) {
 		return err("read_list", "incomplete_list");
@@ -47,7 +47,7 @@ double float_value(const std::string &v) {
 
 #include <sstream>
 
-Element *read_expression(std::istream &in) {
+Obj *read_expression(std::istream &in) {
 	eat_space(in);
 	if (ch == EOF) { return nullptr; }
 	if (ch == '(') { ch = in.get(); return read_list(in, ')'); }

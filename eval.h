@@ -4,9 +4,9 @@
  * also special forms are handled
  */
 
-class Primitive : public Element {
+class Primitive : public Obj {
 	public:
-		virtual Element *apply(Element *args) = 0;
+		virtual Obj *apply(Obj *args) = 0;
 		std::ostream &write(std::ostream &out) override;
 
 };
@@ -15,25 +15,25 @@ std::ostream &Primitive::write(std::ostream &out) {
 	return out << "#primitive";
 }
 
-class Procedure : public Element {
-		Element *args_;
-		Element *body_;
+class Procedure : public Obj {
+		Obj *args_;
+		Obj *body_;
 		Frame *env_;
 	protected:
 		void propagate_mark() override {
 			mark(args_); mark(body_); mark(env_);
 		}
 	public:
-		Procedure(Element *args, Element *body, Frame *env):
+		Procedure(Obj *args, Obj *body, Frame *env):
 			args_ { args },
 			body_ { new Pair { Symbol::get("begin"), body }},
 			env_ { env }
 		{ }
 
-		Element *build_env(Element *arg_values);
-		Element *get_body();
+		Obj *build_env(Obj *arg_values);
+		Obj *get_body();
 
-		Element *apply(Element *arg_values);
+		Obj *apply(Obj *arg_values);
 		std::ostream &write(std::ostream &out) override;
 };
 
@@ -50,13 +50,13 @@ std::ostream &Procedure::write(std::ostream &out) {
 	return out;
 }
 
-Symbol *assert_sym(Element *elm) {
+Symbol *assert_sym(Obj *elm) {
 	auto sym { dynamic_cast<Symbol *>(elm) };
 	if (! sym) { err("assert_sym", "no symbol", elm); }
 	return sym;
 }
 
-Element *eval(Element *exp, Frame *env);
+Obj *eval(Obj *exp, Frame *env);
 
 std::vector<Frame *> active_frames;
 
@@ -74,10 +74,10 @@ class Frame_Guard {
 		~Frame_Guard() { reset(); }
 };
 
-Element *Procedure::build_env(Element *arg_values) {
+Obj *Procedure::build_env(Obj *arg_values) {
 	auto new_env { new Frame { env_ } };
 
-	Element *cur { args_ };
+	Obj *cur { args_ };
 	ASSERT(is_good(cur), "build_env");
 	for (; is_pair(cur); cur = cdr(cur)) {
 		auto sym { assert_sym(car(cur)) };
@@ -97,14 +97,14 @@ Element *Procedure::build_env(Element *arg_values) {
 	return new_env;
 }
 
-Element *Procedure::get_body() {
+Obj *Procedure::get_body() {
 	return body_;
 }
 
-Element *Procedure::apply(Element *arg_values) {
+Obj *Procedure::apply(Obj *arg_values) {
 	auto new_env { dynamic_cast<Frame *>(build_env(arg_values)) };
 	ASSERT(new_env, "procedure apply");
-	Element *result;
+	Obj *result;
 	{
 		Frame_Guard fg { new_env };
 		result = eval(get_body(), new_env);
@@ -112,7 +112,7 @@ Element *Procedure::apply(Element *arg_values) {
 	return result;
 }
 
-Element *apply(Element *op, Element *operands) {
+Obj *apply(Obj *op, Obj *operands) {
 	auto prim { dynamic_cast<Primitive *>(op) };
 	if (prim) { return prim->apply(operands); }
 	auto proc { dynamic_cast<Procedure *>(op) };
@@ -120,7 +120,7 @@ Element *apply(Element *op, Element *operands) {
 	return err("apply", "unknown operation", op);
 }
 
-Element *eval_list(Element *exp, Frame *env) {
+Obj *eval_list(Obj *exp, Frame *env) {
 	if (is_err(exp) || ! exp) { return exp; }
 	auto head { eval(car(exp), env) };
 	auto rest { dynamic_cast<Pair *>(cdr(exp)) };
@@ -140,7 +140,7 @@ inline bool is_define_special(Pair *lst) {
 	return is_tagged_list(lst, "define");
 }
 
-inline Element *define_key(Pair *lst) {
+inline Obj *define_key(Pair *lst) {
 	auto first { cadr(lst) };
 	auto sym { dynamic_cast<Symbol *>(first) };
 	if (sym) { return sym; }
@@ -153,7 +153,7 @@ inline Element *define_key(Pair *lst) {
 	ASSERT(false, "define key");
 }
 
-inline Element *define_value(Pair *lst, Frame *env) {
+inline Obj *define_value(Pair *lst, Frame *env) {
 	auto args { dynamic_cast<Pair *>(cadr(lst)) };
 	if (args) {
 		return new Procedure { cdr(args), cddr(lst), env };
@@ -167,11 +167,11 @@ inline bool is_lambda_special(Pair *lst) {
 	return is_tagged_list(lst, "lambda");
 }
 
-inline Element *lambda_args(Pair *lst) {
+inline Obj *lambda_args(Pair *lst) {
 	return cadr(lst);
 }
 
-inline Element *lambda_body(Pair *lst) {
+inline Obj *lambda_body(Pair *lst) {
 	return cddr(lst);
 }
 
@@ -179,15 +179,15 @@ inline bool is_if_special(Pair *lst) {
 	return is_tagged_list(lst, "if");
 }
 
-inline Element *if_condition(Pair *lst) {
+inline Obj *if_condition(Pair *lst) {
 	return cadr(lst);
 }
 
-inline Element *if_consequence(Pair *lst) {
+inline Obj *if_consequence(Pair *lst) {
 	return caddr(lst);
 }
 
-inline Element *if_alternative(Pair *lst) {
+inline Obj *if_alternative(Pair *lst) {
 	return cadddr(lst);
 }
 
@@ -195,7 +195,7 @@ inline bool is_cond_special(Pair *lst) {
 	return is_tagged_list(lst, "cond");
 }
 
-Element *build_cond(Element *lst) {
+Obj *build_cond(Obj *lst) {
 	if (is_err(lst) || is_null(lst)) { return lst; }
 	auto expr { car(lst) };
 	auto cond { car(expr) };
@@ -240,19 +240,19 @@ inline bool is_let_special(Pair *lst) {
 	return is_tagged_list(lst, "let");
 }
 
-Element *build_let_args(Element *arg_vals, Element *args) {
+Obj *build_let_args(Obj *arg_vals, Obj *args) {
 	if (is_null(arg_vals)) { return args; }
 	args = build_let_args(cdr(arg_vals), args);
 	return new Pair { car(car(arg_vals)), args };
 }
 
-Element *build_let_vals(Element *arg_vals, Element *vals) {
+Obj *build_let_vals(Obj *arg_vals, Obj *vals) {
 	if (is_null(arg_vals)) { return vals; }
 	vals = build_let_vals(cdr(arg_vals), vals);
 	return new Pair { cadr(car(arg_vals)), vals };
 }
 
-Element *build_let(Element *lst) {
+Obj *build_let(Obj *lst) {
 	auto arg_vals { cadr(lst) };
 	auto block { cddr(lst) };
 	ASSERT(is_good(arg_vals) && is_good(block), "let");
@@ -272,8 +272,8 @@ bool is_set_special(Pair *lst) {
 	return is_tagged_list(lst, "set!");
 }
 
-Element *set_var(Element *lst) { return cadr(lst); }
-Element *set_value(Element *lst) { return caddr(lst); }
+Obj *set_var(Obj *lst) { return cadr(lst); }
+Obj *set_value(Obj *lst) { return caddr(lst); }
 
 bool is_valid_set(Pair *lst) {
 	return is_good(set_value(lst)) && is_null(cdddr(lst));
@@ -288,20 +288,20 @@ bool is_valid_assert(Pair *lst) {
 }
 
 class Active_Guard {
-		Element **elm_;
+		Obj **elm_;
 	public:
-		Active_Guard(Element **elm) : elm_ { elm } {
+		Active_Guard(Obj **elm) : elm_ { elm } {
 			if (*elm_) { (*elm_)->make_active(); };
 		}
 		~Active_Guard() { if (*elm_) { (*elm_)->cease_active(); } }
-		void swap(Element *el) {
+		void swap(Obj *el) {
 			if (el) { el->make_active(); }
 			if (*elm_) { (*elm_)->cease_active(); }
 			*elm_ = el;
 		}
 };
 
-Element *eval(Element *exp, Frame *env) {
+Obj *eval(Obj *exp, Frame *env) {
 	Frame_Guard frame_guard;
 	Active_Guard exp_guard { &exp };
 	for (;;) {
@@ -361,7 +361,7 @@ Element *eval(Element *exp, Frame *env) {
 			}
 			if (is_and_special(lst_value)) {
 				auto cur { cdr(lst_value) };
-				Element *result { one };
+				Obj *result { one };
 				for (; is_good(cur) && cur; cur = cdr(cur)) {
 					result = eval(car(cur), env);
 					ASSERT(is_good(result), "and");
@@ -371,7 +371,7 @@ Element *eval(Element *exp, Frame *env) {
 			}
 			if (is_or_special(lst_value)) {
 				auto cur { cdr(lst_value) };
-				Element *result { nullptr };
+				Obj *result { nullptr };
 				for (; is_good(cur) && cur; cur = cdr(cur)) {
 					result = eval(car(cur), env);
 					ASSERT(is_good(result), "or");
