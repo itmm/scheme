@@ -60,6 +60,40 @@ Exact_Complex *Exact_Complex::create_forced(Obj *real, Obj *imag) {
 	return new Exact_Complex(real, imag);
 }
 
+class Inexact_Complex : public Obj {
+		double real_;
+		double imag_;
+		Inexact_Complex(double real, double imag): real_ { real }, imag_ { imag } { }
+	public:
+		Obj *create(double real, double imag);
+		Inexact_Complex *create_forced(double real, double imag);
+		double real() const { return real_; }
+		double imag() const { return imag_; }
+
+		std::ostream &write(std::ostream &out) override {
+			if (! real_) {
+				out << real_;
+				if (! imag_) {
+					out << (imag_ < 0.0 ? "" : "+") << imag_ << "i";
+				}
+			} else if (! imag_) {
+				out << imag_ << "i";
+			} else { out << "0"; }
+			return out;
+		}
+		Obj *negate() {
+			return create(-real_, imag_);
+		}
+};
+
+Obj *Inexact_Complex::create(double real, double imag) {
+	return create_forced(real, imag);
+}
+
+Inexact_Complex *Inexact_Complex::create_forced(double real, double imag) {
+	return new Inexact_Complex(real, imag);
+}
+
 template<typename R>
 class Single_Propagate {
 	protected:
