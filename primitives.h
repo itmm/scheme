@@ -218,12 +218,12 @@ void setup_primitives() {
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
 	initial_frame.insert("null?", new Null_Primitive());
-	initial_frame.insert("#binary+", new Add_Primitive());
-	initial_frame.insert("#binary-", new Sub_Primitive());
-	initial_frame.insert("#binary*", new Mul_Primitive());
-	initial_frame.insert("#binary/", new Div_Primitive());
-	initial_frame.insert("#negate", new Negate_Primitive());
-	initial_frame.insert("#negative?", new Is_Negative_Primitive());
+	initial_frame.insert("@binary+", new Add_Primitive());
+	initial_frame.insert("@binary-", new Sub_Primitive());
+	initial_frame.insert("@binary*", new Mul_Primitive());
+	initial_frame.insert("@binary/", new Div_Primitive());
+	initial_frame.insert("@negate", new Negate_Primitive());
+	initial_frame.insert("@negative?", new Is_Negative_Primitive());
 	initial_frame.insert("<", new Less_Primitive());
 	initial_frame.insert("=", new Equal_Primitive());
 	initial_frame.insert("apply", new Apply_Primitive());

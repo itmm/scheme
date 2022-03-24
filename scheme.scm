@@ -21,11 +21,11 @@
 	(accumulate (op start (car lst))
 	            op
 		    (cdr lst))))
-(define (#mk-simple-numeric op init)
+(define (@mk-simple-numeric op init)
   (lambda args (accumulate init op args)))
-(define + (#mk-simple-numeric #binary+ 0))
-(define * (#mk-simple-numeric #binary* 1))
-(define (#mk-special-numeric op init)
+(define + (@mk-simple-numeric @binary+ 0))
+(define * (@mk-simple-numeric @binary* 1))
+(define (@mk-special-numeric op init)
   (lambda args
     (cond ((null? args)
 		   init)
@@ -34,6 +34,6 @@
 		  (else 
 			(accumulate (car args)
 						op (cdr args))))))
-(define - (#mk-special-numeric #binary- 0))
-(define / (#mk-special-numeric #binary/ 1))
+(define - (@mk-special-numeric @binary- 0))
+(define / (@mk-special-numeric @binary/ 1))
 
