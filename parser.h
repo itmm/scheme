@@ -3,15 +3,49 @@
  */
 
 static int ch { ' ' };
+static bool last_is_hash { false };
+
+int get(std::istream &in) {
+	last_is_hash = (ch == '#');
+	return ch = in.get();
+}
 
 Obj *read_expression(std::istream &in);
 
+void read_block_comment(std::istream &in) {
+	int nesting = 0;
+	bool last_is_bar { false };
+	while (ch != EOF) {
+		if (ch == '|') {
+			if (last_is_hash) { ++nesting; }
+		} else if (ch == '#') {
+			if (last_is_bar) {
+				if (! --nesting) { return; }
+			}
+		}
+		last_is_bar = (ch == '|');
+		get(in);
+
+	}
+	err("parser", "unclosed block comment");
+}
+
 void eat_space(std::istream &in) {
-	while (ch != EOF && (ch <= ' ' || ch == ';')) {
-		if (ch == ';') {
-			while (ch != EOF && ch != '\n') { ch = in.get(); }
-		} else {
-			ch = in.get();
+	for (;;) {
+		switch (ch) {
+			case EOF:
+				 return;
+			case ';':
+				 while (ch != EOF && ch != '\n') { get(in); }
+				 break;
+			case '#':
+				 get(in);
+				 break;
+			case '|':
+				 if (last_is_hash) { read_block_comment(in); } else { return; }
+			default:
+				 if (ch <= ' ') { get(in); } else { return; }
+				 break;
 		}
 	}
 }
@@ -22,7 +56,7 @@ Obj *read_list(std::istream &in, int closing) {
 		return err("read_list", "incomplete_list");
 	}
 	if (ch == closing) {
-		ch = in.get();
+		get(in);
 		return nullptr;
 	}
 	if (ch == ')' || ch == ']') {
@@ -35,7 +69,7 @@ Obj *read_list(std::istream &in, int closing) {
 		auto result { read_expression(in) };
 		eat_space(in);
 		ASSERT(ch == closing, "read_list");
-		ch = in.get();
+		get(in);
 		return result;
 	}
 	return new Pair { exp, read_list(in, closing) };
@@ -50,6 +84,7 @@ double float_value(const std::string &v) {
 bool is_limiter(int ch) {
 	switch (ch) {
 		case EOF:
+		case ';':
 		case '(':
 		case ')':
 		case '[':
@@ -66,7 +101,7 @@ std::string read_token(std::istream &in) {
 	for (;;) {
 		if (is_limiter(ch)) { break; }
 		result << static_cast<char>(ch);
-		ch = in.get();
+		get(in);
 	}
 	return result.str();
 }
@@ -104,10 +139,10 @@ Obj *create_special(const std::string &value) {
 Obj *read_expression(std::istream &in) {
 	eat_space(in);
 	if (ch == EOF) { return nullptr; }
-	if (ch == '(') { ch = in.get(); return read_list(in, ')'); }
-	if (ch == '[') { ch = in.get(); return read_list(in, ']'); }
+	if (ch == '(') { get(in); return read_list(in, ')'); }
+	if (ch == '[') { get(in); return read_list(in, ']'); }
 	if (ch == '\'') {
-		ch = in.get();
+		ch = get(in);
 		return new Pair {
 			Symbol::get("quote"),
 			new Pair { read_expression(in), nullptr }
@@ -115,21 +150,21 @@ Obj *read_expression(std::istream &in) {
 	}
 	if (ch == '"') {
 		std::ostringstream result;
-		ch = in.get();
+		get(in);
 		while (ch != EOF && ch != '"') {
 			result << static_cast<char>(ch);
-			ch = in.get();
+			get(in);
 		}
 		ASSERT(ch == '"', "read");
-		ch = in.get();
+		get(in);
 		return new String { result.str() };
 	}
 
-	if (ch == '#') {
+	if (last_is_hash) {
 		auto val { read_token(in) };
-		if (val == "#f" || val == "#F") {
+		if (val == "f" || val == "F") {
 			return false_obj;
-		} else if (val == "#t" || val == "#T") {
+		} else if (val == "t" || val == "T") {
 			return true_obj;
 		} else {
 			return err("parser", "unknown special", Symbol::get(val));
