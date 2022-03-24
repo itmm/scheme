@@ -305,7 +305,7 @@ Obj *eval(Obj *exp, Frame *env) {
 	Frame_Guard frame_guard;
 	Active_Guard exp_guard { &exp };
 	for (;;) {
-		if (is_err(exp) || ! exp) { return exp; }
+		if (is_err(exp) || ! exp || exp == false_obj) { return exp; }
 		auto int_value { dynamic_cast<Integer *>(exp) };
 		if (int_value) { return int_value; }
 		auto float_value { dynamic_cast<Float *>(exp) };
@@ -336,12 +336,16 @@ Obj *eval(Obj *exp, Frame *env) {
 			if (is_if_special(lst_value)) {
 				auto condition { eval(if_condition(lst_value), env) };
 				ASSERT(is_good(condition), "if");
-				ASSERT(is_null(cddddr(lst_value)), "if");
+				ASSERT(is_null(cdddr(lst_value)) || is_null(cddddr(lst_value)), "if");
 				if (is_true(condition)) {
 					exp_guard.swap(if_consequence(lst_value));
 					continue;
 				} else {
-					exp_guard.swap(if_alternative(lst_value));
+					if (is_null(cdddr(lst_value))) {
+						exp_guard.swap(false_obj);
+					} else {
+						exp_guard.swap(if_alternative(lst_value));
+					}
 					continue;
 				}
 			}
