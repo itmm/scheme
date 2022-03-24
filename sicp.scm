@@ -2,6 +2,7 @@
 ; additional unit-tests
 
 (assert (= (/ 6 3) 2))
+(assert (= 6/3 2))
 (assert (= (remainder 6 3) 0))
 (assert (= (/ 10000 100) 100))
 
