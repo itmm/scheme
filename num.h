@@ -23,6 +23,43 @@ class Fraction : public Obj {
 		Fraction *negate() { return new Fraction { num_->negate(), denom_ }; }
 };
 
+Obj *negate(Obj *a);
+bool is_zero(Obj *a);
+bool is_negative(Obj *a);
+
+class Exact_Complex : public Obj {
+		Obj *real_;
+		Obj *imag_;
+		Exact_Complex(Obj *real, Obj *imag): real_ { real }, imag_ { imag } { }
+	public:
+		Obj *create(Obj *real, Obj *imag);
+		Exact_Complex *create_forced(Obj *real, Obj *imag);
+		Obj *real() const { return real_; }
+		Obj *imag() const { return imag_; }
+		std::ostream &write(std::ostream &out) override {
+			if (! is_zero(real_)) {
+				out << real_;
+				if (! is_zero(imag_)) {
+					out << (is_negative(imag_) ? "" : "+") << imag_ << "i";
+				}
+			} else if (! is_zero(imag_)) {
+				out << imag_ << "i";
+			} else { out << "0"; }
+			return out;
+		}
+		Obj *negate() {
+			return create(::negate(real_), imag_);
+		}
+};
+
+Obj *Exact_Complex::create(Obj *real, Obj *imag) {
+	return create_forced(real, imag);
+}
+
+Exact_Complex *Exact_Complex::create_forced(Obj *real, Obj *imag) {
+	return new Exact_Complex(real, imag);
+}
+
 template<typename R>
 class Single_Propagate {
 	protected:
@@ -52,7 +89,6 @@ class Negate_Propagate : public Single_Propagate<Obj *> {
 
 Obj *negate(Obj *a) { return Negate_Propagate{}.propagate(a); }
 
-bool is_negative(Obj *a);
 
 class Single_Bool_Propagate : public Single_Propagate<bool> {
 	protected:
@@ -70,7 +106,6 @@ class Is_Negative_Propagate : public Single_Bool_Propagate {
 
 bool is_negative(Obj *a) { return Is_Negative_Propagate{}.propagate(a); }
 
-bool is_zero(Obj *a);
 
 class Is_Zero_Propagate : public Single_Bool_Propagate {
 	protected:
