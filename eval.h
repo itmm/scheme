@@ -399,23 +399,6 @@ Obj *eval(Obj *exp, Frame *env) {
 				if (sym) {
 					return env->update(sym, val);
 				}
-				auto pair { dynamic_cast<Pair *>(set_var(lst_value)) };
-				if (pair) {
-					if (is_tagged_list(pair, "car")) {
-						auto got { eval(cadr(pair), env) };
-						auto res { dynamic_cast<Pair *>(got) };
-						ASSERT(res, "set! car");
-						res->set_head(val);
-						return val;
-					}
-					else if (is_tagged_list(pair, "cdr")) {
-						auto got { eval(cadr(pair), env) };
-						auto res { dynamic_cast<Pair *>(got) };
-						ASSERT(res, "set! cdr");
-						res->set_rest(val);
-						return val;
-					}
-				}
 				return err("set!", "unknown key", set_var(lst_value));
 			}
 			if (is_assert_special(lst_value)) {

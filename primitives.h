@@ -191,6 +191,26 @@ class Is_Negative_Primitive: public One_Primitive {
 		}
 };
 
+class Set_Car_Primitive : public Two_Primitive {
+	protected:
+		Obj *apply_two(Obj *first, Obj *second) override {
+			auto pair { dynamic_cast<Pair *>(first) };
+			ASSERT(pair, "set-car!");
+			pair->set_head(second);
+			return second;
+		}
+};
+
+class Set_Cdr_Primitive : public Two_Primitive {
+	protected:
+		Obj *apply_two(Obj *first, Obj *second) override {
+			auto pair { dynamic_cast<Pair *>(first) };
+			ASSERT(pair, "set-cdr!");
+			pair->set_rest(second);
+			return second;
+		}
+};
+
 Frame initial_frame { nullptr };
 
 void setup_primitives() {
@@ -212,4 +232,6 @@ void setup_primitives() {
 	initial_frame.insert("remainder", new Remainder_Primitive());
 	initial_frame.insert("newline", new Newline_Primitive());
 	initial_frame.insert("print", new Print_Primitive());
+	initial_frame.insert("set-car!", new Set_Car_Primitive());
+	initial_frame.insert("set-cdr!", new Set_Cdr_Primitive());
 }
