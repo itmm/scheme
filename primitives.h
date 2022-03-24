@@ -95,7 +95,10 @@ class Div_Primitive : public Two_Primitive {
 class Remainder_Primitive : public Two_Primitive {
 	protected:
 		Obj *apply_two(Obj *first, Obj *second) override {
-			return remainder(first, second);
+			auto a { dynamic_cast<Integer *>(first) };
+			auto b { dynamic_cast<Integer *>(second) };
+			ASSERT(a && b, "remainder");
+			return remainder(a, b);
 		}
 };
 

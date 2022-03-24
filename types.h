@@ -63,7 +63,7 @@ class False : public Obj {
 False *false_obj = new False {};
 
 Obj *to_bool(bool cond) {
-	return cond ?  one : false_obj;
+	return cond ?  static_cast<Obj *>(one) : false_obj;
 }
 
 bool is_true(Obj *value) {
