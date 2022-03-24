@@ -7,8 +7,6 @@
   (car (cddr l)))
 (define (cdddr l)
   (cdr (cddr l)))
-(define #f (or))
-(define #t (and))
 (define (list . l) l)
 (define true #t)
 (define false #f)

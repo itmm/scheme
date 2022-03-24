@@ -60,10 +60,19 @@ class False : public Obj {
 		}
 };
 
+class True : public Obj {
+	public:
+		True() {}
+		std::ostream &write(std::ostream &out) override {
+			return out << "#t";
+		}
+};
+
 False *false_obj = new False {};
+True *true_obj = new True {};
 
 Obj *to_bool(bool cond) {
-	return cond ?  static_cast<Obj *>(one) : false_obj;
+	return cond ?  static_cast<Obj *>(true_obj) : false_obj;
 }
 
 bool is_true(Obj *value) {

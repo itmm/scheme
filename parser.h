@@ -71,6 +71,23 @@ Obj *read_expression(std::istream &in) {
 		return new String { result.str() };
 	}
 
+	if (ch == '#') {
+		std::ostringstream result;
+		for (;;) {
+			if (ch == EOF || ch <= ' ' || ch == '(' || ch == ')' || ch == '[' || ch == ']' || ch == '"') { break; }
+			result << static_cast<char>(ch);
+			ch = in.get();
+		}
+		auto val { result.str() };
+		if (val == "#f" || val == "#F") {
+			return false_obj;
+		} else if (val == "#t" || val == "#T") {
+			return true_obj;
+		} else {
+			return err("parser", "unknown special", Symbol::get(val));
+		}
+	}
+
 	std::ostringstream result;
 	bool numeric { true };
 	bool digits { false };

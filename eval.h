@@ -305,7 +305,7 @@ Obj *eval(Obj *exp, Frame *env) {
 	Frame_Guard frame_guard;
 	Active_Guard exp_guard { &exp };
 	for (;;) {
-		if (is_err(exp) || ! exp || exp == false_obj) { return exp; }
+		if (is_err(exp) || ! exp || exp == false_obj || exp == true_obj) { return exp; }
 		auto int_value { dynamic_cast<Integer *>(exp) };
 		if (int_value) { return int_value; }
 		auto float_value { dynamic_cast<Float *>(exp) };
@@ -365,7 +365,7 @@ Obj *eval(Obj *exp, Frame *env) {
 			}
 			if (is_and_special(lst_value)) {
 				auto cur { cdr(lst_value) };
-				Obj *result { one };
+				Obj *result { true_obj };
 				for (; is_true(cur) && cur; cur = cdr(cur)) {
 					result = eval(car(cur), env);
 					ASSERT(is_good(result), "and");

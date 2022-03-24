@@ -7,8 +7,6 @@
 "  (car (cddr l)))\n"
 "(define (cdddr l)\n"
 "  (cdr (cddr l)))\n"
-"(define #f (or))\n"
-"(define #t (and))\n"
 "(define (list . l) l)\n"
 "(define true #t)\n"
 "(define false #f)\n"
