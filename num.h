@@ -14,6 +14,7 @@ class Fraction : public Obj {
 	public:
 		static Fraction *create_forced(Integer *num, Integer *denom);
 		static Obj *create(Obj *num, Obj *denom);
+		static Obj *create(const std::string &value);
 		Integer *num() const { return num_; }
 		Integer *denom() const { return denom_; }
 		std::ostream &write(std::ostream &out) override {
@@ -342,3 +343,13 @@ Obj *Fraction::create(Obj *num, Obj *denom) {
 	return new Fraction { ni, di };
 }
 
+#include <sstream>
+
+Obj *Fraction::create(const std::string &value) {
+	std::string num;
+	std::string denom;
+	std::istringstream in { value };
+	ASSERT(std::getline(in, num, '/'), "fraction create num");
+	ASSERT(std::getline(in, denom), "fraction create denom");
+	return create(Integer::create(num), Integer::create(denom));
+}
