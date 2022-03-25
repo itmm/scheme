@@ -301,19 +301,17 @@ class Active_Guard {
 		}
 };
 
+bool evals_to_self(Obj *obj) {
+	if (dynamic_cast<Symbol *>(obj)) { return false; }
+	if (dynamic_cast<Pair *>(obj)) { return false; }
+	return true;
+}
+
 Obj *eval(Obj *exp, Frame *env) {
 	Frame_Guard frame_guard;
 	Active_Guard exp_guard { &exp };
 	for (;;) {
-		if (is_err(exp) || ! exp || exp == false_obj || exp == true_obj) { return exp; }
-		auto int_value { dynamic_cast<Integer *>(exp) };
-		if (int_value) { return int_value; }
-		auto float_value { dynamic_cast<Float *>(exp) };
-		if (float_value) { return float_value; }
-		auto fract_value { dynamic_cast<Fraction *>(exp) };
-		if (fract_value) { return fract_value; }
-		auto str_value { dynamic_cast<String *>(exp) };
-		if (str_value) { return str_value; }
+		if (evals_to_self(exp)) { return exp; }
 		auto sym_value { dynamic_cast<Symbol *>(exp) };
 		if (sym_value) {
 			return env->has(sym_value->value()) ? env->get(sym_value->value()) : exp;

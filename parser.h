@@ -106,13 +106,28 @@ std::string read_token(std::istream &in) {
 	return result.str();
 }
 
-Obj *create_special(const std::string &value) {
+Obj *create_number(const std::string &value) {
 	bool digits { false };
 	bool dots { false };
 	bool fraction { false };
 	bool first { true };
+	bool exact_complex { false };
+	bool inexact_complex { false };
+	bool assert_last { false };
 	for (auto ch : value) {
-		if (first && (ch == '+' || ch == '-')) {
+		if (assert_last) {
+			return nullptr;
+		} else if (first && (ch == '+' || ch == '-')) {
+		} else if (! exact_complex && ! inexact_complex && (ch == '+' || ch == '-')) {
+			inexact_complex = dots;
+			exact_complex = ! dots;
+			digits = dots = fraction = false;	
+		} else if ((ch == 'i' || ch == 'I') && (exact_complex || inexact_complex)) {
+			assert_last = true;
+		} else if (ch == 'i' || ch == 'I') {
+			inexact_complex = dots;
+			exact_complex = ! dots;
+			assert_last = true;
 		} else if (ch >= '0' && ch <= '9') {
 			digits = true;
 		} else if (ch == '/') {
@@ -121,17 +136,28 @@ Obj *create_special(const std::string &value) {
 				fraction = true;
 			} else { return nullptr; }
 		} else if (ch == '.') {
-			if (digits && ! dots) {
+			if (digits && ! dots && ! fraction) {
 				digits = false;
 				dots = true;
 			} else { return nullptr; }
 		} else { return nullptr; }
 		first = false;
 	}
-	if (digits && fraction && ! dots) { return Fraction::create(value); }
-	if (digits && ! dots) { return Integer::create(value); }
-	if (digits && dots) {
-		return new Float { float_value(value) };
+
+	if (exact_complex) {
+		if (digits && ! dots) {
+			return Exact_Complex::create(value);
+		}
+	} else if (inexact_complex) {
+		if (digits && ! fraction) {
+			return Inexact_Complex::create(value);
+		}
+	} else {
+		if (digits && fraction && ! dots) { return Fraction::create(value); }
+		if (digits && ! dots) { return Integer::create(value); }
+		if (digits && dots) {
+			return new Float { float_value(value) };
+		}
 	}
 	return nullptr;
 }
@@ -172,6 +198,6 @@ Obj *read_expression(std::istream &in) {
 	}
 
 	auto tok { read_token(in) };
-	auto result { create_special(tok) };
+	auto result { create_number(tok) };
 	return result ?: Symbol::get(tok);
 }
