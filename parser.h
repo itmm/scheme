@@ -36,7 +36,11 @@ void eat_space(std::istream &in) {
 			case EOF:
 				 return;
 			case ';':
-				 while (ch != EOF && ch != '\n') { get(in); }
+				 if (! last_is_hash) {
+				 	while (ch != EOF && ch != '\n') { get(in); }
+				 } else {
+				 	return;
+				 }
 				 break;
 			case '#':
 				 get(in);
@@ -90,6 +94,7 @@ bool is_limiter(int ch) {
 		case '[':
 		case ']':
 		case '"':
+		case '#':
 			return true;
 		default:
 			return ch <= ' ';
@@ -162,7 +167,9 @@ Obj *create_number(const std::string &value) {
 	return nullptr;
 }
 
-Obj *read_expression(std::istream &in) {
+int skip_expressions { 0 };
+
+Obj *parse_expression(std::istream &in) {
 	eat_space(in);
 	if (ch == EOF) { return nullptr; }
 	if (ch == '(') { get(in); return read_list(in, ')'); }
@@ -187,17 +194,34 @@ Obj *read_expression(std::istream &in) {
 	}
 
 	if (last_is_hash) {
-		auto val { read_token(in) };
-		if (val == "f" || val == "F") {
+		if (ch == ';') {
+			get(in);
+			skip_expressions += 2;
 			return false_obj;
-		} else if (val == "t" || val == "T") {
-			return true_obj;
 		} else {
-			return err("parser", "unknown special", Symbol::get(val));
+			auto val { read_token(in) };
+			if (val == "f" || val == "F") {
+				return false_obj;
+			} else if (val == "t" || val == "T") {
+				return true_obj;
+			} else {
+				return err("parser", "unknown special", Symbol::get(val));
+			}
 		}
 	}
 
 	auto tok { read_token(in) };
 	auto result { create_number(tok) };
 	return result ?: Symbol::get(tok);
+}
+
+Obj *read_expression(std::istream &in) {
+	Obj *result;
+	for (;;) {
+		result = parse_expression(in);
+		if (skip_expressions) {
+			--skip_expressions;
+		} else { break; };
+	}
+	return result;
 }
