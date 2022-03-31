@@ -28,7 +28,7 @@
 "\t   (() 1)\n"
 "\t   ((a) a)\n"
 "\t   ((a b) (@binary* a b))\n"
-"\t   (x (apply * (cons (@binary*  (car x) (cadr x)) (cddr x))))))\n"
+"\t   (x (apply * (cons (@binary* (car x) (cadr x)) (cddr x))))))\n"
 "(define / (lambda-case\n"
 "\t   (() 1)\n"
 "\t   ((a) (@binary/ 1 a))\n"

@@ -28,7 +28,7 @@
 	   (() 1)
 	   ((a) a)
 	   ((a b) (@binary* a b))
-	   (x (apply * (cons (@binary*  (car x) (cadr x)) (cddr x))))))
+	   (x (apply * (cons (@binary* (car x) (cadr x)) (cddr x))))))
 (define / (lambda-case
 	   (() 1)
 	   ((a) (@binary/ 1 a))

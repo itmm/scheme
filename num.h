@@ -99,7 +99,7 @@ class Exact_Complex : public Obj {
 			return out;
 		}
 		Obj *negate() {
-			return create(::negate(real_), imag_);
+			return create(::negate(real_), ::negate(imag_));
 		}
 };
 
@@ -117,38 +117,41 @@ Exact_Complex *Exact_Complex::create_forced(Obj *real, Obj *imag) {
 	return new Exact_Complex(real, imag);
 }
 
+#include <complex>
+
 class Inexact_Complex : public Obj {
-		double real_;
-		double imag_;
-		Inexact_Complex(double real, double imag): real_ { real }, imag_ { imag } { }
+		using num_type = std::complex<double>;
+		num_type value_;
+		Inexact_Complex(const num_type &value): value_ { value } { }
 	public:
-		static Obj *create(double real, double imag);
+		static Obj *create(const num_type &value);
 		static Obj *create(const std::string &value);
-		static Inexact_Complex *create_forced(double real, double imag);
-		double real() const { return real_; }
-		double imag() const { return imag_; }
+		static Inexact_Complex *create_forced(const num_type &value);
+		const num_type &value() const { return value_; }
+		double real() const { return value_.real(); }
+		double imag() const { return value_.imag(); }
 
 		std::ostream &write(std::ostream &out) override {
-			if (! real_) {
-				out << real_;
-				if (! imag_) {
-					out << (imag_ < 0.0 ? "" : "+") << imag_ << "i";
+			if (real()) {
+				out << real();
+				if (imag()) {
+					out << (imag() < 0.0 ? "" : "+") << imag() << "i";
 				}
-			} else if (! imag_) {
-				out << imag_ << "i";
+			} else if (imag()) {
+				out << imag() << "i";
 			} else { out << "0"; }
 			return out;
 		}
 		Obj *negate() {
-			return create(-real_, imag_);
+			return create(-value_);
 		}
 };
 
-Obj *Inexact_Complex::create(double real, double imag) {
-	if (imag == 0.0) {
-		return new Float { real };
+Obj *Inexact_Complex::create(const num_type &value) {
+	if (value.imag() == 0.0) {
+		return new Float { value.real() };
 	}
-	return create_forced(real, imag);
+	return create_forced(value);
 }
 
 Obj *Inexact_Complex::create(const std::string &value) {
@@ -156,11 +159,11 @@ Obj *Inexact_Complex::create(const std::string &value) {
 	auto real { dynamic_cast<Float *>(pair.first) };
 	auto imag { dynamic_cast<Float *>(pair.second) };
 	ASSERT(real && imag, "create complex");
-	return create(real->value(), imag->value());
+	return create(num_type { real->value(), imag->value() });
 }
 
-Inexact_Complex *Inexact_Complex::create_forced(double real, double imag) {
-	return new Inexact_Complex(real, imag);
+Inexact_Complex *Inexact_Complex::create_forced(const num_type &value) {
+	return new Inexact_Complex { value };
 }
 
 template<typename R>
@@ -221,11 +224,7 @@ class Is_Negative_Propagate : public Single_Bool_Propagate {
 			return (rn && in) || (rn && iz) || (rz && in);
 		}
 		bool apply_inexact_complex(Inexact_Complex *a) override {
-			bool rn { a->real() < 0 };
-			bool rz { a->real() == 0 };
-			bool in { a->imag() < 0 };
-			bool iz { a->imag() == 0 };
-			return (rn && in) || (rn && iz) || (rz && in);
+			return a->value().real() < 0.0;
 	       	}
 };
 
@@ -239,7 +238,7 @@ class Is_Zero_Propagate : public Single_Bool_Propagate {
 		bool apply_fract(Fraction *a) override { return is_zero(a->num()); }
 		bool apply_real(Float *a) override { return a->value() == 0.0; }
 		bool apply_exact_complex(Exact_Complex *a) override { return is_zero(a->real()) && is_zero(a->imag()); }
-		bool apply_inexact_complex(Inexact_Complex *a) override { return a->real() == 0.0 && a->imag() == 0.0; }
+		bool apply_inexact_complex(Inexact_Complex *a) override { return a->value() == 0.0; }
 };
 
 bool is_zero(Obj *a) { return Is_Zero_Propagate{}.propagate(a); }
@@ -296,12 +295,12 @@ Obj *Propagate::propagate(Obj *a, Obj *b) {
 	auto bic { dynamic_cast<Inexact_Complex *>(b) };
 	if (aic || bic) {
 		if (! aic) {
-			if (ai) { aic = Inexact_Complex::create_forced(ai->float_value(), 0.0); }
-			else if (afl) { aic = Inexact_Complex::create_forced(afl->value(), 0.0); }
+			if (ai) { aic = Inexact_Complex::create_forced({ ai->float_value(), 0.0 }); }
+			else if (afl) { aic = Inexact_Complex::create_forced({ afl->value(), 0.0 }); }
 		}
 		if (! bic) {
-			if (bi) { bic = Inexact_Complex::create_forced(bi->float_value(), 0.0); }
-			else if (bfl) { bic = Inexact_Complex::create_forced(bfl->value(), 0.0); }
+			if (bi) { bic = Inexact_Complex::create_forced({ bi->float_value(), 0.0 }); }
+			else if (bfl) { bic = Inexact_Complex::create_forced({ bfl->value(), 0.0 }); }
 		}
 		if (aic && bic) { return apply_inexact_complex(aic, bic); }
 	}
@@ -334,10 +333,7 @@ class Add_Propagate : public Propagate {
 			);
 		}
 		Obj *apply_inexact_complex(Inexact_Complex *a, Inexact_Complex *b) override {
-			return Inexact_Complex::create(
-				a->real() + b->real(),
-				a->imag() + b->imag()
-			);
+			return Inexact_Complex::create(a->value() + b->value());
 		}
 
 };
@@ -376,10 +372,7 @@ class Sub_Propagate : public Propagate {
 			);
 		}
 		Obj *apply_inexact_complex(Inexact_Complex *a, Inexact_Complex *b) override {
-			return Inexact_Complex::create(
-				a->real() - b->real(),
-				a->imag() - b->imag()
-			);
+			return Inexact_Complex::create(a->value() - b->value());
 		}
 };
 
@@ -425,10 +418,7 @@ class Mul_Propagate : public Propagate {
 			);
 		}
 		Obj *apply_inexact_complex(Inexact_Complex *a, Inexact_Complex *b) override {
-			return Inexact_Complex::create(
-				a->real() * b->real() - a->imag() * b->imag(),
-				a->real() * b->imag() + a->imag() * b->real()
-			);
+			return Inexact_Complex::create(a->value() * b->value());
 		}
 };
 
@@ -469,13 +459,7 @@ class Div_Propagate : public Propagate {
 			);
 		}
 		Obj *apply_inexact_complex(Inexact_Complex *a, Inexact_Complex *b) override {
-			double t1 = a->real() * b->real();
-			double t2 = a->imag() * b->imag();
-			double denum = b->real() * b->real() - b->imag() * b->imag();
-			return Inexact_Complex::create(
-				(t1 + t2) / denum,
-				(t1 - t2) / denum
-			);
+			return Inexact_Complex::create(a->value() / b->value());
 		}
 };
 
