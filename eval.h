@@ -15,38 +15,57 @@ std::ostream &Primitive::write(std::ostream &out) {
 	return out << "#primitive";
 }
 
+struct Procedure_Case {
+	Procedure_Case(Obj *a, Obj *b): args { a }, body { b } { }
+	Obj *args;
+	Obj *body;
+};
+
 class Procedure : public Obj {
-		Obj *args_;
-		Obj *body_;
 		Frame *env_;
 	protected:
 		void propagate_mark() override {
-			mark(args_); mark(body_); mark(env_);
+			mark(env_);
+			for (auto &c : cases_) {
+				mark(c.args);
+				mark(c.body);
+			}
 		}
 	public:
-		Procedure(Obj *args, Obj *body, Frame *env):
-			args_ { args },
-			body_ { new Pair { Symbol::get("begin"), body }},
-			env_ { env }
-		{ }
+		std::vector<Procedure_Case> cases_;
+		Procedure(Frame *env): env_ { env } { }
 
-		Obj *build_env(Obj *arg_values);
-		Obj *get_body();
+		void add_case(Obj *args, Obj *body) {
+			cases_.emplace_back(args, new Pair { Symbol::get("begin"), body });
+		}
+
+		Procedure(Obj *args, Obj *body, Frame *env): env_ { env }
+		{
+			add_case(args, body);
+	       	}
+
+		Obj *build_env(Procedure_Case &c, Obj *arg_values);
+		Obj *get_body(Procedure_Case &c);
 
 		Obj *apply(Obj *arg_values);
 		std::ostream &write(std::ostream &out) override;
 };
 
 std::ostream &Procedure::write(std::ostream &out) {
-	out << "(lambda " << args_;
-	if (is_pair(cdr(body_))) {
-		out << "\n  ";
-		write_inner_complex_pair(out, dynamic_cast<Pair *>(cdr(body_)), " ");
+	if (cases_.size() == 1) {
+		out << "(lambda " << cases_[0].args;
+		if (is_pair(cdr(cases_[0].body))) {
+			out << "\n  ";
+			write_inner_complex_pair(out, dynamic_cast<Pair *>(cdr(cases_[0].body)), " ");
+		}
+		else {
+			out << " . " << cdr(cases_[0].body);
+		}
+		out << ')';
+	} else {
+		out << "#lambda-case";
+
 	}
-	else {
-		out << " . " << cdr(body_);
-	}
-	out << ')';
 	return out;
 }
 
@@ -74,10 +93,10 @@ class Frame_Guard {
 		~Frame_Guard() { reset(); }
 };
 
-Obj *Procedure::build_env(Obj *arg_values) {
+Obj *Procedure::build_env(Procedure_Case &c, Obj *arg_values) {
 	auto new_env { new Frame { env_ } };
 
-	Obj *cur { args_ };
+	Obj *cur { c.args };
 	ASSERT(is_good(cur), "build_env");
 	for (; is_pair(cur); cur = cdr(cur)) {
 		auto sym { assert_sym(car(cur)) };
@@ -97,19 +116,27 @@ Obj *Procedure::build_env(Obj *arg_values) {
 	return new_env;
 }
 
-Obj *Procedure::get_body() {
-	return body_;
+Obj *Procedure::get_body(Procedure_Case &c) {
+	return c.body;
+}
+
+bool case_matches(const Procedure_Case &c, Obj *arg_values) {
+	return true;
 }
 
 Obj *Procedure::apply(Obj *arg_values) {
-	auto new_env { dynamic_cast<Frame *>(build_env(arg_values)) };
-	ASSERT(new_env, "procedure apply");
-	Obj *result;
-	{
-		Frame_Guard fg { new_env };
-		result = eval(get_body(), new_env);
+	for (auto &c : cases_) {
+		if (case_matches(c, arg_values)) {
+			auto new_env { dynamic_cast<Frame *>(build_env(c, arg_values)) };
+			ASSERT(new_env, "procedure apply");
+			{
+				Frame_Guard fg { new_env };
+				return eval(get_body(c), new_env);
+			}
+		}
 	}
-	return result;
+
+	return err("procedure-apply", "no match", arg_values);
 }
 
 Obj *apply(Obj *op, Obj *operands) {
@@ -410,12 +437,23 @@ Obj *eval(Obj *exp, Frame *env) {
 			auto lst { eval_list(lst_value, env) };
 			auto proc { dynamic_cast<Procedure *>(car(lst)) };
 			if (proc) {
-				auto new_env { dynamic_cast<Frame *>(proc->build_env(cdr(lst))) };
-				ASSERT(new_env, "eval apply");
-				frame_guard.set(new_env);
-				env = new_env;
-				exp_guard.swap(proc->get_body());
-				continue;
+				bool done { false };
+				for (auto &c : proc->cases_) {
+					if (case_matches(c, cdr(lst))) {
+						auto new_env { dynamic_cast<Frame *>(proc->build_env(c, cdr(lst))) };
+						ASSERT(new_env, "eval apply");
+						env = new_env;
+						exp_guard.swap(proc->get_body(c));
+						done = true;
+						break;
+					}
+				}
+
+				if (done) {
+					continue;
+				} else {
+					return err("procedure-apply", "no match", cdr(lst));
+				}
 			}
 			return apply(car(lst), cdr(lst));
 		}
