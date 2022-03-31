@@ -13,25 +13,25 @@
 (define (> a b)
   (< b a))
 (define (not a) (if a #f #t))
-(define (accumulate start op lst)
-  (if (null? lst)
-	start
-	(accumulate (op start (car lst))
-	            op
-		    (cdr lst))))
-(define (@mk-simple-numeric op init)
-  (lambda args (accumulate init op args)))
-(define + (@mk-simple-numeric @binary+ 0))
-(define * (@mk-simple-numeric @binary* 1))
-(define (@mk-special-numeric op init)
-  (lambda args
-    (cond ((null? args)
-		   init)
-          ((null? (cdr args))
-		   (op init (car args)))
-		  (else 
-			(accumulate (car args)
-						op (cdr args))))))
-(define - (@mk-special-numeric @binary- 0))
-(define / (@mk-special-numeric @binary/ 1))
+
+(define + (lambda-case
+	   (() 0)
+	   ((a) a)
+	   ((a b) (@binary+ a b))
+	   (x (apply + (cons (@binary+ (car x) (cadr x)) (cddr x))))))
+(define - (lambda-case
+	   (() 0)
+	   ((a) (@binary- 0 a))
+	   ((a b) (@binary- a b))
+	   (x (apply - (cons (@binary- (car x) (cadr x)) (cddr x))))))
+(define * (lambda-case
+	   (() 1)
+	   ((a) a)
+	   ((a b) (@binary* a b))
+	   (x (apply * (cons (@binary*  (car x) (cadr x)) (cddr x))))))
+(define / (lambda-case
+	   (() 1)
+	   ((a) (@binary/ 1 a))
+	   ((a b) (@binary/ a b))
+	   (x (apply / (cons (@binary/ (car x) (cadr x)) (cddr x))))))
 

@@ -120,8 +120,18 @@ Obj *Procedure::get_body(Procedure_Case &c) {
 	return c.body;
 }
 
+bool matches(Obj *args, Obj *values) {
+	if (! args) { return values == nullptr; }
+	auto pa { dynamic_cast<Pair *>(args) };
+	if (! pa) { return true; }
+	auto pv { dynamic_cast<Pair *>(values) };
+	if (! pv) { return false; }
+	return matches(cdr(pa), cdr(pv));
+
+}
+
 bool case_matches(const Procedure_Case &c, Obj *arg_values) {
-	return true;
+	return matches(c.args, arg_values);
 }
 
 Obj *Procedure::apply(Obj *arg_values) {
@@ -200,6 +210,14 @@ inline Obj *lambda_args(Pair *lst) {
 
 inline Obj *lambda_body(Pair *lst) {
 	return cddr(lst);
+}
+
+inline bool is_lambda_case_special(Pair *lst) {
+	return is_tagged_list(lst, "lambda-case") && is_pair(cdr(lst));
+}
+
+inline Obj *lambda_case_cases(Pair *lst) {
+	return cdr(lst);
 }
 
 inline bool is_if_special(Pair *lst) {
@@ -357,6 +375,15 @@ Obj *eval(Obj *exp, Frame *env) {
 				auto body { lambda_body(lst_value) };
 				ASSERT(is_good(args) && is_good(body), "lambda");
 				return new Procedure(args, body, env);
+			}
+			if (is_lambda_case_special(lst_value)) {
+				auto cases { lambda_case_cases(lst_value) };
+				auto proc { new Procedure(env) };
+				for (; is_pair(cases) && is_pair(car(cases)); cases = cdr(cases)) {
+					auto pair { dynamic_cast<Pair *>(car(cases)) };
+					proc->add_case(car(pair), cdr(pair));
+				}
+				return proc;
 			}
 			if (is_if_special(lst_value)) {
 				auto condition { eval(if_condition(lst_value), env) };
