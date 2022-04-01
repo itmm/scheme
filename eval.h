@@ -372,18 +372,83 @@ class Syntax : public Element {
 		const std::string name_;
 		std::set<std::string> keywords_;
 		std::vector<Syntax_Rule> rules_;
+		bool is_repeating(Obj *cur) {
+			auto nxt { dynamic_cast<Pair *>(cdr(cur)) };
+			if (! nxt) { return false; }
+			auto sym { dynamic_cast<Symbol *>(car(nxt)) };
+			return sym && sym->value() == "...";
+		}
+		Frame *match_one(Obj *pattern, Obj *value, Frame *match, bool repeating) {
+			auto pair { dynamic_cast<Pair *>(pattern) };
+			if (pair) {
+				auto vp { dynamic_cast<Pair *>(value) };
+				if (! vp) { return nullptr; }
+				return match_rest(pair, vp, match, repeating);
+			}
+			auto sym { dynamic_cast<Symbol *>(pattern) };
+			if (sym) {
+				if (keywords_.find(sym->value()) != keywords_.end()) {
+					if (value == sym) {
+						if (! match) {
+							match = new Frame { nullptr };
+						}
+						return match;
+					} else { return nullptr; }
+				}
+				if (! match) { match = new Frame { nullptr }; }
+				if (repeating) {
+					auto nw { new Pair {
+						value, match->get(sym->value())
+					}};
+					match->insert(sym->value(), nw);
+				} else {
+					match->insert(sym->value(), value);
+				}
+			}
+			return nullptr;
+		}
+		Frame *match_rest(Obj *pattern, Obj *values, Frame *match, bool repeating) {
+			for (;;) {
+				if (! pattern) {
+					if (! values) { return nullptr; }
+					if (! match) { match = new Frame { nullptr }; }
+					return match;
+				}
+				if (! is_pair(pattern)) { return nullptr; }
+				bool repeating { is_repeating(pattern) };
+				if (! repeating) {
+					if (! is_pair(values)) { return nullptr; }
+					match = match_one(car(pattern), car(values), match, false);
+					if (! match) { return nullptr; }
+					values = cdr(values);
+				} else {
+					while (values) {
+						if (! is_pair(values)) { return nullptr; }
+						match = match_one(car(pattern), car(values), match, true);
+						if (! match) { return nullptr; }
+						values = cdr(values);
+					}
+				}
+				pattern = cdr(pattern);
+				if (repeating) {
+				       	pattern = cdr(pattern);
+					if (! pattern) { err("match-rest", "elements after ...", pattern); return nullptr; }
+			       	}
+			}
+
+		}
+		Frame *build_match(Syntax_Rule &rule, Obj *lst) {
+			return match_rest(rule.pattern, lst, nullptr, false);
+		}
+		Obj *apply_match(Syntax_Rule &rule, Frame *match) {
+			return err("syntax", "match not implemented");
+		}
 	protected:
 		void propagate_mark() override {
 			for (auto &r : rules_) {
 				mark(r.pattern);
 				mark(r.replacement);
 			}
-		}
-		Frame *build_match(Syntax_Rule &rule, Obj *lst) {
-			return nullptr;
-		}
-		Obj *apply_match(Syntax_Rule &rule, Frame *match) {
-			return err("syntax", "match not implemented");
 		}
 	public:
 		Syntax(const std::string name) : name_ { name } { }
