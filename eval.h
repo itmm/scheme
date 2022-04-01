@@ -181,6 +181,10 @@ inline bool is_define_special(Pair *lst) {
 	return is_tagged_list(lst, "define");
 }
 
+inline bool is_define_syntax_special(Obj *lst) {
+	return is_tagged_list(lst, "define-syntax");
+}
+
 inline Obj *define_key(Pair *lst) {
 	auto first { cadr(lst) };
 	auto sym { dynamic_cast<Symbol *>(first) };
@@ -438,6 +442,32 @@ Obj *eval(Obj *exp, Frame *env) {
 				ASSERT(key && is_good(value), "define");
 				env->insert(key->value(), value);
 				return value;
+			}
+			if (is_define_syntax_special(lst_value)) {
+				auto name { dynamic_cast<Symbol *>(cadr(lst_value)) };
+				auto rules { dynamic_cast<Pair *>(caddr(lst_value)) };
+				ASSERT(name && rules && ! cdddr(lst_value), "syntax-rules");
+				ASSERT(is_tagged_list(rules, "syntax-rules"), "ysyntax-rules");
+				auto se { new Syntax { name->value() } };
+				auto keywords { cadr(rules) };
+				for (; keywords; keywords = cdr(keywords)) {
+					ASSERT(is_pair(keywords), "syntax-rules");
+					auto sym { dynamic_cast<Symbol *>(car(keywords)) };
+					ASSERT(sym, "syntax-rules");
+					se->add_keyword(sym->value());
+				}
+				auto cur { cddr(rules) };
+				for (; cur && is_good(cur); cur = cdr(cur)) {
+					ASSERT(is_pair(cur), "syntax-rules");
+					auto rule { dynamic_cast<Pair *>(car(cur)) };
+					ASSERT(rule, "syntax-rules");
+					auto pattern { dynamic_cast<Pair *>(car(rule)) };
+					auto replacement { dynamic_cast<Pair *>(cadr(rule)) };
+					ASSERT(pattern && replacement && ! cddr(rule), "syntax-rules");
+					se->add_rule(pattern, replacement);
+				}
+				syntax_extensions[se->name()] = se;
+				return se;
 			}
 			if (is_lambda_special(lst_value)) {
 				auto args { lambda_args(lst_value) };
