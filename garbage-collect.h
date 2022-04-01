@@ -8,6 +8,7 @@ std::vector<Obj *> Obj::active_elements;
 
 std::pair<unsigned, unsigned> Obj::garbage_collect() {
 	current_mark = ! current_mark;
+	for (auto &s : syntax_extensions) { (*s.second).mark(); }
 	for (auto &f : active_frames) { f->mark(); }
 	for (auto &e : active_elements) { e->mark(); }
 

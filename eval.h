@@ -168,8 +168,12 @@ Obj *eval_list(Obj *exp, Frame *env) {
 	}
 }
 
-bool is_tagged_list(Pair *lst, const std::string &tag) {
-	auto sym { dynamic_cast<Symbol *>(car(lst)) };
+Symbol *first_symbol(Obj *lst) {
+	return dynamic_cast<Symbol *>(car(lst));
+}
+
+bool is_tagged_list(Obj *lst, const std::string &tag) {
+	auto sym { first_symbol(lst) };
 	return sym && sym->value() == tag;
 }
 
@@ -352,6 +356,65 @@ bool evals_to_self(Obj *obj) {
 	return true;
 }
 
+struct Syntax_Rule {
+	Syntax_Rule(Obj *p, Obj *r): pattern { p }, replacement { r } { }
+	Obj *pattern;
+	Obj *replacement;
+};
+
+#include <set>
+
+class Syntax : public Element {
+		const std::string name_;
+		std::set<std::string> keywords_;
+		std::vector<Syntax_Rule> rules_;
+	protected:
+		void propagate_mark() override {
+			for (auto &r : rules_) {
+				mark(r.pattern);
+				mark(r.replacement);
+			}
+		}
+		Frame *build_match(Syntax_Rule &rule, Obj *lst) {
+			return nullptr;
+		}
+		Obj *apply_match(Syntax_Rule &rule, Frame *match) {
+			return err("syntax", "match not implemented");
+		}
+	public:
+		Syntax(const std::string name) : name_ { name } { }
+		const std::string &name() const { return name_; }
+		void add_keyword(const std::string &kw) { keywords_.insert(kw); }
+		void add_rule(Obj *pattern, Obj *replacement) {
+			rules_.emplace_back(pattern, replacement);
+		}
+		std::ostream &write(std::ostream &out) override {
+			return out << "#syntax";
+		}
+		Obj *apply(Obj *lst, Frame *env) {
+			for (auto &r : rules_) {
+				auto m { build_match(r, lst) };
+				if (m) {
+					return apply_match(r, m);
+				}
+			}
+			return err("syntax", "no match", lst);
+		}
+};
+
+std::map<std::string, Syntax *> syntax_extensions;
+
+Syntax *find_syntax_extension(Obj *lst) {
+	auto sym { first_symbol(lst) };
+	if (sym) {
+		auto got { syntax_extensions.find(sym->value()) };
+		if (got != syntax_extensions.end()) {
+			return got->second;
+		}
+	}
+	return nullptr;
+}
+
 Obj *eval(Obj *exp, Frame *env) {
 	Frame_Guard frame_guard;
 	Active_Guard exp_guard { &exp };
@@ -363,6 +426,12 @@ Obj *eval(Obj *exp, Frame *env) {
 		}
 		auto lst_value { dynamic_cast<Pair *>(exp) };
 		if (lst_value) {
+			auto se { find_syntax_extension(lst_value) };
+			if (se) {
+				exp_guard.swap(se->apply(lst_value, env));
+				ASSERT(is_good(exp), "syntax-apply");
+				continue;
+			}
 			if (is_define_special(lst_value)) {
 				auto key { dynamic_cast<Symbol *>(define_key(lst_value)) };
 				auto value { define_value(lst_value, env) };
