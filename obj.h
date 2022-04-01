@@ -9,47 +9,25 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <set>
 
 class Obj {
-		Obj *next_;
+		using Mark_Container = std::set<Obj *>;
+		static Mark_Container a_marked_;
+		static Mark_Container b_marked_;
+		static Mark_Container *current_marked_;
+		static Mark_Container *other_marked_;
 
-		static Obj *all_elements;
-		static bool current_mark;
 		static std::vector<Obj *> active_elements;
 
-		bool get_mark() {
-			return static_cast<bool>(reinterpret_cast<size_t>(next_) & 0x1);
-		}
-
 		bool has_current_mark() {
-			return get_mark() == current_mark;
-		}
-
-		void toggle_mark() {
-			next_ = reinterpret_cast<Obj *>(
-				reinterpret_cast<size_t>(next_) ^ 0x1
-			);
-		}
-
-		static Obj *add_mark(Obj *ptr, bool mark) {
-			return reinterpret_cast<Obj *>(
-				reinterpret_cast<size_t>(ptr) | static_cast<size_t>(mark)
-			);
-		}
-
-		static Obj *add_current_mark(Obj *ptr) {
-			return add_mark(ptr, current_mark);
-		}
-
-		static Obj *remove_mark(Obj *marked, bool mark) {
-			return reinterpret_cast<Obj *>(
-				reinterpret_cast<size_t>(marked) ^ static_cast<size_t>(mark)
-			);
+			return current_marked_->find(this) != current_marked_->end();
 		}
 
 		void mark() {
 			if (! has_current_mark()) {
-				toggle_mark();
+				other_marked_->erase(this);
+				current_marked_->insert(this);
 				propagate_mark();
 			}
 		}
@@ -60,10 +38,11 @@ class Obj {
 		void mark(Obj *elm) { if (elm) { elm->mark(); } }
 
 	public:
-		Obj(): next_ { add_current_mark(all_elements) } {
-			all_elements = this;
+		Obj() { current_marked_->insert(this); }
+		virtual ~Obj() {
+			current_marked_->erase(this);
+			other_marked_->erase(this);
 		}
-		virtual ~Obj() { }
 		virtual std::ostream &write(std::ostream &out) = 0;
 		static std::pair<unsigned, unsigned> garbage_collect();
 
@@ -73,7 +52,12 @@ class Obj {
 		}
 };
 
-using Element = Obj;
+Obj::Mark_Container Obj::a_marked_;
+Obj::Mark_Container Obj::b_marked_;
+Obj::Mark_Container *Obj::current_marked_ { &a_marked_ };
+Obj::Mark_Container *Obj::other_marked_ { &b_marked_ };
+
+std::vector<Obj *> Obj::active_elements;
 
 inline std::ostream &operator<<(std::ostream &out, Obj *elm) {
 	if (elm) {

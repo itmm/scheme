@@ -368,7 +368,7 @@ struct Syntax_Rule {
 
 #include <set>
 
-class Syntax : public Element {
+class Syntax : public Obj {
 		const std::string name_;
 		std::set<std::string> keywords_;
 		std::vector<Syntax_Rule> rules_;
