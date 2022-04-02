@@ -306,19 +306,50 @@ Obj *build_let_vals(Obj *arg_vals, Obj *vals) {
 }
 
 Obj *build_let(Obj *lst) {
-	auto arg_vals { cadr(lst) };
-	auto block { cddr(lst) };
+	lst = cdr(lst);
+	auto name { dynamic_cast<Symbol *>(car(lst)) };
+	if (name) { lst = cdr(lst); };
+	auto arg_vals { car(lst) };
+	auto block { cdr(lst) };
 	ASSERT(is_good(arg_vals) && is_good(block), "let");
 	auto args { build_let_args(arg_vals, nullptr) };
 	auto vals { build_let_vals(arg_vals, nullptr) };
-	auto result { new Pair {
-		new Pair {
-			Symbol::get("lambda"),
-			new Pair { args, block }
-		},
-		vals
+	auto lambda { new Pair {
+		Symbol::get("lambda"),
+		new Pair { args, block }
 	}};
-	return result;
+	if (name) {
+		// (let name ((a 2) (b 3)) x y)
+		// ((lambda (name) (name 2 3)) (lambda (a b) x y))
+		// ((lambda (name) (set! name (lambda (a b) x y)) (name 2 3)) #f)
+		// ((lambda (a b) x y) 2 3)
+
+		auto inner_arg = new Pair { name, nullptr };
+		auto inner_set = new Pair { 
+			Symbol::get("set!"),
+			new Pair {
+				name,
+				new Pair { lambda, nullptr }
+			}
+		};
+		auto inner_call = new Pair { name, vals };
+		auto inner = new Pair {
+			Symbol::get("lambda"),
+			new Pair {
+				inner_arg,
+				new Pair {
+					inner_set,
+					new Pair {
+						inner_call,
+						nullptr
+					}
+				}
+			}
+		};
+		return new Pair { inner, new Pair { false_obj, nullptr } };
+	} else {
+		return new Pair { lambda, vals };
+	}
 }
 
 bool is_set_special(Pair *lst) {
