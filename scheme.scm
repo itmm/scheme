@@ -19,22 +19,22 @@
 	   (() 0)
 	   ((a) a)
 	   ((a b) (@binary+ a b))
-	   (x (apply + (cons (@binary+ (car x) (cadr x)) (cddr x))))))
+	   (x (apply + (@binary+ (car x) (cadr x)) (cddr x)))))
 (define - (lambda-case
 	   (() 0)
 	   ((a) (@binary- 0 a))
 	   ((a b) (@binary- a b))
-	   (x (apply - (cons (@binary- (car x) (cadr x)) (cddr x))))))
+	   (x (apply - (@binary- (car x) (cadr x)) (cddr x)))))
 (define * (lambda-case
 	   (() 1)
 	   ((a) a)
 	   ((a b) (@binary* a b))
-	   (x (apply * (cons (@binary* (car x) (cadr x)) (cddr x))))))
+	   (x (apply * (@binary* (car x) (cadr x)) (cddr x)))))
 (define / (lambda-case
 	   (() 1)
 	   ((a) (@binary/ 1 a))
 	   ((a b) (@binary/ a b))
-	   (x (apply / (cons (@binary/ (car x) (cadr x)) (cddr x))))))
+	   (x (apply / (@binary/ (car x) (cadr x)) (cddr x)))))
 
 (define (map f ls . more)
   (if (null? more)
@@ -49,6 +49,7 @@
 	    (cons
 	      (apply f (car ls) (map car more))
 	      (map-more (cdr ls) (map cdr more)))))))
+
 (define (exists f ls . more)
   (and (not (null? ls))
        (let exists_ ([x (car ls)] [ls (cdr ls)] [more more])

@@ -64,7 +64,7 @@ int main(int argc, const char *argv[]) {
 		};
 		process_stream(s, true);
 	}
-
+	syntax_tests();
 	if (argc > 1) {
 		for (int i { 1 }; i < argc; ++i) {
 			if (argv[i] == std::string { "--help" }) {

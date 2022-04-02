@@ -174,6 +174,7 @@ Obj *parse_expression(std::istream &in) {
 	if (ch == EOF) { return nullptr; }
 	if (ch == '(') { get(in); return read_list(in, ')'); }
 	if (ch == '[') { get(in); return read_list(in, ']'); }
+	if (ch == ')' || ch == ']') { get(in); return nullptr; }
 	if (ch == '\'') {
 		ch = get(in);
 		return new Pair {
@@ -213,6 +214,12 @@ Obj *parse_expression(std::istream &in) {
 	auto tok { read_token(in) };
 	auto result { create_number(tok) };
 	return result ?: Symbol::get(tok);
+}
+
+Obj *parse_expression(const std::string &in) {
+	std::istringstream iss { in };
+	get(iss);
+	return parse_expression(iss);
 }
 
 Obj *read_expression(std::istream &in) {

@@ -400,6 +400,7 @@ struct Syntax_Rule {
 #include <set>
 
 class Syntax : public Obj {
+	public:
 		const std::string name_;
 		std::set<std::string> keywords_;
 		std::vector<Syntax_Rule> rules_;
@@ -435,13 +436,14 @@ class Syntax : public Obj {
 				} else {
 					match->insert(sym->value(), value);
 				}
+				return match;
 			}
 			return nullptr;
 		}
 		Frame *match_rest(Obj *pattern, Obj *values, Frame *match, bool repeating) {
 			for (;;) {
 				if (! pattern) {
-					if (! values) { return nullptr; }
+					if (values) { return nullptr; }
 					if (! match) { match = new Frame { nullptr }; }
 					return match;
 				}
@@ -513,6 +515,30 @@ Syntax *find_syntax_extension(Obj *lst) {
 		}
 	}
 	return nullptr;
+}
+
+#include <cassert>
+
+void syntax_tests() {
+	auto s { new Syntax { "test" } };
+	s->add_keyword("foo");
+	s->add_rule(parse_expression("(_ x)"), parse_expression("(* x x)"));
+	std::cerr << s->rules_[0].pattern << '\n';
+	std::cerr << s->rules_[0].replacement << '\n';
+	auto m1 { s->match_one(parse_expression("foo"), parse_expression("foo"), nullptr, false) };
+	assert(m1 != nullptr);
+	auto m2 { s->match_one(parse_expression("x"), parse_expression("42"), nullptr, false) };
+	assert(m2 != nullptr);
+	assert(is_equal_num(m2->get("x"), Integer::create(42)));
+	auto m3 { s->match_rest(nullptr, nullptr, nullptr, false) };
+	assert(m3 != nullptr);
+	auto m4 { s->match_rest(parse_expression("(a b)"), parse_expression("(2 3)"), nullptr, false) };
+	assert(m4 != nullptr);
+	assert(is_equal_num(m4->get("a"), Integer::create(2)));
+	assert(is_equal_num(m4->get("b"), Integer::create(3)));
+	auto m5 { s->build_match(s->rules_[0], parse_expression("(test 42)")) };
+	assert (m5 != nullptr);
+	std::cerr << m5->get("_") << '\n';
 }
 
 Obj *eval(Obj *exp, Frame *env) {
