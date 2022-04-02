@@ -49,10 +49,27 @@ class Cons_Primitive : public Two_Primitive {
 		}
 };
 
-class Apply_Primitive: public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return ::apply(first, second);
+class Apply_Primitive: public Primitive {
+		Obj *build_arg_lst(Obj *args) {
+			ASSERT(is_pair(args), "apply");
+			if (! cdr(args)) {
+				ASSERT(is_pair(car(args)), "apply");
+				return car(args);
+			} else {
+				return new Pair {
+					car(args),
+					build_arg_lst(cdr(args))
+				};
+			}
+		}
+	public:
+		Obj *apply(Obj *args) override {
+			ASSERT(is_pair(args), "apply");
+			auto proc { dynamic_cast<Procedure *>(car(args)) };
+			ASSERT(proc, "apply");
+			auto lst { build_arg_lst(cdr(args)) };
+			ASSERT(is_pair(lst), "apply");
+			return ::apply(proc, lst);
 		}
 };
 
