@@ -10,6 +10,7 @@
 "(define (list . l) l)\n"
 "(define true #t)\n"
 "(define false #f)\n"
+"(define (null? a) (eq? a '()))\n"
 "(define (> a b)\n"
 "  (< b a))\n"
 "(define (not a) (if a #f #t))\n"

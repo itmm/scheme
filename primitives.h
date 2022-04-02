@@ -35,11 +35,6 @@ class Cdr_Primitive : public One_Primitive {
 		Obj *apply_one(Obj *arg) override { return cdr(arg); }
 };
 
-class Null_Primitive : public One_Primitive {
-	protected:
-		Obj *apply_one(Obj *arg) override { return to_bool(is_null(arg)); }
-};
-
 class Two_Primitive : public Primitive {
 	protected:
 		virtual Obj *apply_two(Obj *first, Obj *second) = 0;
@@ -181,6 +176,22 @@ class Eq_Primitive : public Two_Primitive {
 		}
 };
 
+class Eqv_Primitive : public Two_Primitive {
+	protected:
+		Obj *apply_two(Obj *first, Obj *second) override {
+			if (first == second) { return to_bool(true); }
+			if (is_true(is_equal_num(first, second))) {
+				return to_bool(true);
+			}
+			auto as { dynamic_cast<String *>(first) };
+			auto bs { dynamic_cast<String *>(second) };
+			if (as && bs && as->value() == bs->value()) {
+				return to_bool(true);
+			}
+			return to_bool(false);
+		}
+};
+
 std::ostream *out { &std::cout };
 
 class Newline_Primitive : public Zero_Primitive {
@@ -246,7 +257,6 @@ void setup_primitives() {
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
-	initial_frame.insert("null?", new Null_Primitive());
 	initial_frame.insert("@binary+", new Add_Primitive());
 	initial_frame.insert("@binary-", new Sub_Primitive());
 	initial_frame.insert("@binary*", new Mul_Primitive());
@@ -258,6 +268,7 @@ void setup_primitives() {
 	initial_frame.insert("apply", new Apply_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
 	initial_frame.insert("eq?", new Eq_Primitive());
+	initial_frame.insert("eqv?", new Eqv_Primitive());
 	initial_frame.insert("remainder", new Remainder_Primitive());
 	initial_frame.insert("newline", new Newline_Primitive());
 	initial_frame.insert("print", new Print_Primitive());

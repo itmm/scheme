@@ -10,6 +10,7 @@
 (define (list . l) l)
 (define true #t)
 (define false #f)
+(define (null? a) (eq? a '()))
 (define (> a b)
   (< b a))
 (define (not a) (if a #f #t))
