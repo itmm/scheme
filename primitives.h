@@ -13,6 +13,17 @@ class One_Primitive : public Primitive {
 		}
 };
 
+bool is_symbol(Obj *obj) {
+	return dynamic_cast<Symbol *>(obj) != nullptr;
+}
+
+class Symbol_Primitive : public One_Primitive {
+	protected:
+		Obj *apply_one(Obj *arg) override { 
+			return to_bool(is_symbol(arg));
+	       	}
+};
+
 class Car_Primitive : public One_Primitive {
 	protected:
 		Obj *apply_one(Obj *arg) override { return car(arg); }
@@ -53,7 +64,7 @@ class Apply_Primitive: public Primitive {
 		Obj *build_arg_lst(Obj *args) {
 			ASSERT(is_pair(args), "apply");
 			if (! cdr(args)) {
-				ASSERT(is_pair(car(args)), "apply");
+				ASSERT(! car(args) || is_pair(car(args)), "apply");
 				return car(args);
 			} else {
 				return new Pair {
@@ -65,8 +76,8 @@ class Apply_Primitive: public Primitive {
 	public:
 		Obj *apply(Obj *args) override {
 			ASSERT(is_pair(args), "apply");
-			auto proc { dynamic_cast<Procedure *>(car(args)) };
-			ASSERT(proc, "apply");
+			auto proc { car(args) };
+			ASSERT(dynamic_cast<Procedure *>(proc) || dynamic_cast<Primitive *>(proc), "apply");
 			auto lst { build_arg_lst(cdr(args)) };
 			ASSERT(is_pair(lst), "apply");
 			return ::apply(proc, lst);
@@ -231,6 +242,7 @@ class Set_Cdr_Primitive : public Two_Primitive {
 Frame initial_frame { nullptr };
 
 void setup_primitives() {
+	initial_frame.insert("symbol?", new Symbol_Primitive());
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
