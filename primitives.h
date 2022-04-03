@@ -17,10 +17,18 @@ bool is_symbol(Obj *obj) {
 	return dynamic_cast<Symbol *>(obj) != nullptr;
 }
 
-class Symbol_Primitive : public One_Primitive {
+class Predicate : public One_Primitive {
 	protected:
-		Obj *apply_one(Obj *arg) override { 
-			return to_bool(is_symbol(arg));
+		virtual bool is_true(Obj *arg) = 0;
+		Obj *apply_one(Obj *arg) override {
+			return to_bool(is_true(arg));
+		}
+};
+
+class Symbol_Primitive : public Predicate {
+	protected:
+		bool is_true(Obj *arg) override { 
+			return is_symbol(arg);
 		}
 };
 
@@ -83,10 +91,17 @@ bool is_numeric(Obj *arg) {
 	return dynamic_cast<Numeric *>(arg) != nullptr;
 }
 
-class Numeric_Primitive : public One_Primitive {
+class Numeric_Primitive : public Predicate {
 	protected:
-		Obj *apply_one(Obj *arg) override { 
-			return to_bool(is_numeric(arg));
+		bool is_true(Obj *arg) override { 
+			return is_numeric(arg);
+		}
+};
+
+class Pair_Primitive : public Predicate {
+	protected:
+		bool is_true(Obj *arg) override {
+			return is_pair(arg);
 		}
 };
 
@@ -172,26 +187,30 @@ class Garbage_Collect_Primitive : public Zero_Primitive {
 		}
 };
 
-class Eq_Primitive : public Two_Primitive {
+class Binary_Predicate : public Two_Primitive {
 	protected:
+		virtual bool is_true(Obj *first, Obj *second) = 0;
 		Obj *apply_two(Obj *first, Obj *second) override {
-			return to_bool(first == second);
+			return to_bool(is_true(first, second));
 		}
 };
 
-class Eqv_Primitive : public Two_Primitive {
+class Eq_Primitive : public Binary_Predicate {
 	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			if (first == second) { return to_bool(true); }
-			if (is_true(is_equal_num(first, second))) {
-				return to_bool(true);
-			}
+		bool is_true(Obj *first, Obj *second) override {
+			return first == second;
+		}
+};
+
+class Eqv_Primitive : public Binary_Predicate {
+	protected:
+		bool is_true(Obj *first, Obj *second) override {
+			if (first == second) { return true; }
+			if (::is_true(is_equal_num(first, second))) { return true; }
 			auto as { dynamic_cast<String *>(first) };
 			auto bs { dynamic_cast<String *>(second) };
-			if (as && bs && as->value() == bs->value()) {
-				return to_bool(true);
-			}
-			return to_bool(false);
+			if (as && bs && as->value() == bs->value()) { return true; }
+			return false;
 		}
 };
 
@@ -226,10 +245,10 @@ class Negate_Primitive: public One_Primitive {
 		}
 };
 
-class Is_Negative_Primitive: public One_Primitive {
+class Is_Negative_Primitive: public Predicate {
 	protected:
-		Obj *apply_one(Obj *arg) override {
-			return to_bool(is_negative(arg));
+		bool is_true(Obj *arg) override {
+			return is_negative(arg);
 		}
 };
 
@@ -257,6 +276,7 @@ Frame initial_frame { nullptr };
 
 void setup_primitives() {
 	initial_frame.insert("symbol?", new Symbol_Primitive());
+	initial_frame.insert("pair?", new Pair_Primitive());
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
