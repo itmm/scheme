@@ -2,11 +2,13 @@
  * numeric types
  */
 
+class Numeric : public Obj { };
+
 #include "int.h"
 
-using Float = Value_Element<double>;
+using Float = Value_Element<double, Numeric>;
 
-class Fraction : public Obj {
+class Fraction : public Numeric {
 		Integer *num_;
 		Integer *denom_;
 		Fraction(Integer *num, Integer *denom): num_ { num }, denom_ { denom } { }
@@ -77,7 +79,7 @@ std::pair<Obj *, Obj *> create_complex_pair(const std::string &value) {
 	};
 }
 
-class Exact_Complex : public Obj {
+class Exact_Complex : public Numeric {
 		Obj *real_;
 		Obj *imag_;
 		Exact_Complex(Obj *real, Obj *imag): real_ { real }, imag_ { imag } { }
@@ -119,7 +121,7 @@ Exact_Complex *Exact_Complex::create_forced(Obj *real, Obj *imag) {
 
 #include <complex>
 
-class Inexact_Complex : public Obj {
+class Inexact_Complex : public Numeric {
 		using num_type = std::complex<double>;
 		num_type value_;
 		Inexact_Complex(const num_type &value): value_ { value } { }

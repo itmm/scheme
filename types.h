@@ -4,8 +4,8 @@
  * nullptr is treated as the empty pair
  */
 
-template<typename VALUE_TYPE>
-class Value_Element : public Obj {
+template<typename VALUE_TYPE, typename BASE = Obj>
+class Value_Element : public BASE {
 		VALUE_TYPE value_;
 	public:
 		Value_Element(const VALUE_TYPE &value): value_ { value } { }

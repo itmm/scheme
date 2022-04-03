@@ -2,7 +2,7 @@
  * big integer type
  */
 
-class Integer : public Obj {
+class Integer : public Numeric {
 	public:
 		using Digits = std::vector<unsigned short>;
 	private:

@@ -21,7 +21,7 @@ class Symbol_Primitive : public One_Primitive {
 	protected:
 		Obj *apply_one(Obj *arg) override { 
 			return to_bool(is_symbol(arg));
-	       	}
+		}
 };
 
 class Car_Primitive : public One_Primitive {
@@ -79,12 +79,15 @@ class Apply_Primitive: public Primitive {
 		}
 };
 
-class Numeric_Primitive : public Two_Primitive {
+bool is_numeric(Obj *arg) {
+	return dynamic_cast<Numeric *>(arg) != nullptr;
+}
+
+class Numeric_Primitive : public One_Primitive {
 	protected:
-		Obj *apply_two(Obj *a, Obj *b) override;
-		virtual Obj *do_int(Integer &a, Integer &b) = 0;
-		virtual Obj *do_float(double a, double b) = 0;
-		virtual Obj *do_fract(Fraction &a, Fraction &b) = 0;
+		Obj *apply_one(Obj *arg) override { 
+			return to_bool(is_numeric(arg));
+		}
 };
 
 class Add_Primitive : public Two_Primitive {
@@ -274,4 +277,6 @@ void setup_primitives() {
 	initial_frame.insert("print", new Print_Primitive());
 	initial_frame.insert("set-car!", new Set_Car_Primitive());
 	initial_frame.insert("set-cdr!", new Set_Cdr_Primitive());
+	initial_frame.insert("numeric?", new Numeric_Primitive());
+
 }
