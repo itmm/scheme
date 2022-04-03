@@ -57,14 +57,14 @@ void eat_space(std::istream &in) {
 Obj *read_list(std::istream &in, int closing) {
 	eat_space(in);
 	if (ch == EOF) {
-		return err("read_list", "incomplete_list");
+		err("read_list", "incomplete_list");
 	}
 	if (ch == closing) {
 		get(in);
 		return nullptr;
 	}
 	if (ch == ')' || ch == ']') {
-		return err("read_list", "unmatched closing");
+		err("read_list", "unmatched closing");
 	}
 
 	auto exp { read_expression(in) };
@@ -206,7 +206,7 @@ Obj *parse_expression(std::istream &in) {
 			} else if (val == "t" || val == "T") {
 				return true_obj;
 			} else {
-				return err("parser", "unknown special", Symbol::get(val));
+				err("parser", "unknown special", Symbol::get(val));
 			}
 		}
 	}

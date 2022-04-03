@@ -75,14 +75,12 @@ Obj *to_bool(bool cond) {
 	return cond ?  static_cast<Obj *>(true_obj) : false_obj;
 }
 
-bool is_true(Obj *value) {
-	if (is_err(value)) { err("is_true", "no value"); }
-	return is_good(value) && value != false_obj;
+bool is_false(Obj *value) {
+	return value == false_obj;
 }
 
-bool is_false(Obj *value) {
-	if (is_err(value)) { err("is_false", "no value"); }
-	return value == false_obj;
+bool is_true(Obj *value) {
+	return ! is_false(value);
 }
 
 class Pair : public Obj {

@@ -202,7 +202,6 @@ bool is_int(Obj *a) {
 }
 
 static Integer *int_half(Integer *num) {
-	if (! is_good(num)) { err("half", "invalid arg", num); return nullptr; }
 	Integer::Digits result;
 	result.resize(num->digits().size());
 	int carry { 0 };

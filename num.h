@@ -198,7 +198,7 @@ class Negate_Propagate : public Single_Propagate<Obj *> {
 		Obj *apply_real(Float *a) override { return new Float { - a->value() }; }
 		Obj *apply_exact_complex(Exact_Complex *a) override { return a->negate(); }
 		Obj *apply_inexact_complex(Inexact_Complex *a) override { return a->negate(); }
-		Obj *apply_else(Obj *a) { ASSERT(false, "negate"); }
+		Obj *apply_else(Obj *a) { err("negate", "else", a); return nullptr; }
 };
 
 Obj *negate(Obj *a) { return Negate_Propagate{}.propagate(a); }
@@ -304,7 +304,8 @@ Obj *Propagate::propagate(Obj *a, Obj *b) {
 		}
 		if (aic && bic) { return apply_inexact_complex(aic, bic); }
 	}
-	return err("propagate", "can't propagate", a, b);
+	err("propagate", "can't propagate", a, b);
+	return nullptr;
 }
 
 Obj *add(Obj *a, Obj *b);
@@ -492,10 +493,12 @@ class Less_Propagate : public Propagate {
 			return to_bool(a->value() < b->value());
 		}
 		Obj *apply_exact_complex(Exact_Complex *a, Exact_Complex *b) override {
-			ASSERT(false, "complex less");
+			err("less", "complex", a, b);
+			return nullptr;
 		}
 		Obj *apply_inexact_complex(Inexact_Complex *a, Inexact_Complex *b) override {
-			ASSERT(false, "complex less");
+			err("less", "complex", a, b);
+			return nullptr;
 		}
 };
 

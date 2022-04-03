@@ -18,7 +18,7 @@
 std::ostream *prompt { nullptr };
 std::ostream *result { nullptr };
 
-void process_stream(std::istream &in, bool with_header) {
+void process_stream(std::istream &in, bool with_header, bool exit_on_exception) {
 	active_frames.clear();
 	active_frames.push_back(&initial_frame);
 
@@ -28,10 +28,15 @@ void process_stream(std::istream &in, bool with_header) {
 		while (ch != EOF && ch != '\n') { ch = in.get(); }
 	}
 	for (;;) {
-		auto exp { read_expression(in) };
-		if (! in) { break; }
-		exp = eval(exp, &initial_frame);
-		if (result) { *result << exp << "\n"; }
+		try {
+			auto exp { read_expression(in) };
+			if (! in) { break; }
+			exp = eval(exp, &initial_frame);
+			if (result) { *result << exp << "\n"; }
+		} catch (Error *err) {
+			if (err_stream) { *err_stream << err << '\n'; }
+			if (exit_on_exception) { return; }
+		}
 		if (prompt) { *prompt << "? "; }
 	}
 }
@@ -41,7 +46,7 @@ void process_stdin() {
 	auto old_result { result };
 	prompt = &std::cout;
 	result = &std::cout;
-	process_stream(std::cin, false);
+	process_stream(std::cin, false, false);
 	result = old_result;
 	prompt = old_prompt;
 }
@@ -62,7 +67,7 @@ int main(int argc, const char *argv[]) {
 		std::istringstream s { 
 			#include "scheme.scm.h"
 		};
-		process_stream(s, true);
+		process_stream(s, true, true);
 	}
 	syntax_tests();
 	if (argc > 1) {
@@ -76,7 +81,7 @@ int main(int argc, const char *argv[]) {
 				std::ifstream in { argv[i] };
 				auto old_result { result };
 				result = &std::cout;
-				process_stream(in, true);
+				process_stream(in, true, true);
 				result = old_result;
 			}
 		}

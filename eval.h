@@ -97,20 +97,16 @@ Obj *Procedure::build_env(Procedure_Case &c, Obj *arg_values) {
 	auto new_env { new Frame { env_ } };
 
 	Obj *cur { c.args };
-	ASSERT(is_good(cur), "build_env");
 	for (; is_pair(cur); cur = cdr(cur)) {
 		auto sym { assert_sym(car(cur)) };
 		ASSERT(sym, "build_env");
 		auto value { car(arg_values) };
-		ASSERT(is_good(value), "build_env");
 		new_env->insert(sym->value(), value);
 		arg_values = cdr(arg_values);
 	}
-	ASSERT(is_good(cur), "build_env");
 	if (cur) {
 		auto sym { assert_sym(cur) };
 		ASSERT(sym, "build_env");
-		ASSERT(is_good(arg_values), "build_env");
 		new_env->insert(sym->value(), arg_values);
 	}
 	return new_env;
@@ -146,7 +142,8 @@ Obj *Procedure::apply(Obj *arg_values) {
 		}
 	}
 
-	return err("procedure-apply", "no match", arg_values);
+	err("procedure-apply", "no match", arg_values);
+	return nullptr;
 }
 
 Obj *apply(Obj *op, Obj *operands) {
@@ -154,11 +151,12 @@ Obj *apply(Obj *op, Obj *operands) {
 	if (prim) { return prim->apply(operands); }
 	auto proc { dynamic_cast<Procedure *>(op) };
 	if (proc) { return proc->apply(operands); }
-	return err("apply", "unknown operation", op);
+	err("apply", "unknown operation", op);
+	return nullptr;
 }
 
 Obj *eval_list(Obj *exp, Frame *env) {
-	if (is_err(exp) || ! exp) { return exp; }
+	if (! exp) { return exp; }
 	auto head { eval(car(exp), env) };
 	auto rest { dynamic_cast<Pair *>(cdr(exp)) };
 	if (rest) {
@@ -196,6 +194,7 @@ inline Obj *define_key(Pair *lst) {
 		return name;
 	}
 	ASSERT(false, "define key");
+	return nullptr;
 }
 
 inline Obj *define_value(Pair *lst, Frame *env) {
@@ -249,15 +248,14 @@ inline bool is_cond_special(Pair *lst) {
 }
 
 Obj *build_cond(Obj *lst) {
-	if (is_err(lst) || is_null(lst)) { return lst; }
+	if (is_null(lst)) { return lst; }
 	auto expr { car(lst) };
 	auto cond { car(expr) };
 	auto cons { cdr(expr) };
-	ASSERT(is_good(cond) && is_good(cons), "cond");
 	auto sym { dynamic_cast<Symbol *>(cond) };
 	if (sym && sym->value() == "else") {
 		if (cdr(lst)) {
-			return err("cond", "else not in last case");
+			err("cond", "else not in last case");
 		}
 		return new Pair { Symbol::get("begin"), cons };
 	}
@@ -311,7 +309,6 @@ Obj *build_let(Obj *lst) {
 	if (name) { lst = cdr(lst); };
 	auto arg_vals { car(lst) };
 	auto block { cdr(lst) };
-	ASSERT(is_good(arg_vals) && is_good(block), "let");
 	auto args { build_let_args(arg_vals, nullptr) };
 	auto vals { build_let_vals(arg_vals, nullptr) };
 	auto lambda { new Pair {
@@ -360,7 +357,7 @@ Obj *set_var(Obj *lst) { return cadr(lst); }
 Obj *set_value(Obj *lst) { return caddr(lst); }
 
 bool is_valid_set(Pair *lst) {
-	return is_good(set_value(lst)) && is_null(cdddr(lst));
+	return is_null(cdddr(lst));
 }
 
 bool is_assert_special(Pair * lst) {
@@ -368,7 +365,7 @@ bool is_assert_special(Pair * lst) {
 }
 
 bool is_valid_assert(Pair *lst) {
-	return is_good(cadr(lst)) && is_null(cddr(lst));
+	return is_null(cddr(lst));
 }
 
 class Active_Guard {
@@ -474,7 +471,8 @@ class Syntax : public Obj {
 			return match_rest(rule.pattern, lst, nullptr, false);
 		}
 		Obj *apply_match(Syntax_Rule &rule, Frame *match) {
-			return err("syntax", "match not implemented");
+			err("syntax", "match not implemented");
+			return nullptr;
 		}
 	protected:
 		void propagate_mark() override {
@@ -500,7 +498,8 @@ class Syntax : public Obj {
 					return apply_match(r, m);
 				}
 			}
-			return err("syntax", "no match", lst);
+			err("syntax", "no match", lst);
+			return nullptr;
 		}
 };
 
@@ -555,13 +554,12 @@ Obj *eval(Obj *exp, Frame *env) {
 			auto se { find_syntax_extension(lst_value) };
 			if (se) {
 				exp_guard.swap(se->apply(lst_value, env));
-				ASSERT(is_good(exp), "syntax-apply");
 				continue;
 			}
 			if (is_define_special(lst_value)) {
 				auto key { dynamic_cast<Symbol *>(define_key(lst_value)) };
 				auto value { define_value(lst_value, env) };
-				ASSERT(key && is_good(value), "define");
+				ASSERT(key, "define");
 				env->insert(key->value(), value);
 				return value;
 			}
@@ -579,7 +577,7 @@ Obj *eval(Obj *exp, Frame *env) {
 					se->add_keyword(sym->value());
 				}
 				auto cur { cddr(rules) };
-				for (; cur && is_good(cur); cur = cdr(cur)) {
+				for (; cur; cur = cdr(cur)) {
 					ASSERT(is_pair(cur), "syntax-rules");
 					auto rule { dynamic_cast<Pair *>(car(cur)) };
 					ASSERT(rule, "syntax-rules");
@@ -594,7 +592,6 @@ Obj *eval(Obj *exp, Frame *env) {
 			if (is_lambda_special(lst_value)) {
 				auto args { lambda_args(lst_value) };
 				auto body { lambda_body(lst_value) };
-				ASSERT(is_good(args) && is_good(body), "lambda");
 				return new Procedure(args, body, env);
 			}
 			if (is_lambda_case_special(lst_value)) {
@@ -608,7 +605,6 @@ Obj *eval(Obj *exp, Frame *env) {
 			}
 			if (is_if_special(lst_value)) {
 				auto condition { eval(if_condition(lst_value), env) };
-				ASSERT(is_good(condition), "if");
 				ASSERT(is_null(cdddr(lst_value)) || is_null(cddddr(lst_value)), "if");
 				if (is_true(condition)) {
 					exp_guard.swap(if_consequence(lst_value));
@@ -624,14 +620,12 @@ Obj *eval(Obj *exp, Frame *env) {
 			}
 			if (is_cond_special(lst_value)) {
 				exp_guard.swap(build_cond(cdr(lst_value)));
-				ASSERT(is_good(exp), "cond");
 				continue;
 			}
 			if (is_begin_special(lst_value)) {
 				auto cur { cdr(lst_value) };
 				for (; cdr(cur); cur = cdr(cur)) {
-					auto result { eval(car(cur), env) };
-					ASSERT(is_good(result), "begin");
+					eval(car(cur), env);
 				}
 				exp_guard.swap(car(cur));
 				continue;
@@ -641,7 +635,6 @@ Obj *eval(Obj *exp, Frame *env) {
 				Obj *result { true_obj };
 				for (; is_true(cur) && cur; cur = cdr(cur)) {
 					result = eval(car(cur), env);
-					ASSERT(is_good(result), "and");
 					if (is_false(result)) { break; }
 				}
 				return result;
@@ -649,9 +642,8 @@ Obj *eval(Obj *exp, Frame *env) {
 			if (is_or_special(lst_value)) {
 				auto cur { cdr(lst_value) };
 				Obj *result { false_obj };
-				for (; is_good(cur) && cur; cur = cdr(cur)) {
+				for (; cur; cur = cdr(cur)) {
 					result = eval(car(cur), env);
-					ASSERT(is_good(result), "or");
 					if (is_true(result)) { break; }
 				}
 				return result;
@@ -661,24 +653,22 @@ Obj *eval(Obj *exp, Frame *env) {
 			}
 			if (is_let_special(lst_value)) {
 				exp_guard.swap(build_let(lst_value));
-				ASSERT(is_good(exp), "let");
 				continue;
 			}
 			if (is_set_special(lst_value)) {
 				ASSERT(is_valid_set(lst_value), "set!");
 				auto sym { dynamic_cast<Symbol *>(set_var(lst_value)) };
 				auto val { eval(set_value(lst_value), env) };
-				ASSERT(is_good(val), "set!");
 				if (sym) {
 					return env->update(sym, val);
 				}
-				return err("set!", "unknown key", set_var(lst_value));
+				err("set!", "unknown key", set_var(lst_value));
 			}
 			if (is_assert_special(lst_value)) {
 				ASSERT(is_valid_assert(lst_value), "assert");
 				auto val { eval(cadr(lst_value), env) };
 				if (is_false(val)) {
-					return err("assert", "failed", lst_value);
+					err("assert", "failed", lst_value);
 				}
 				return Symbol::get("ok");
 			}
@@ -700,12 +690,13 @@ Obj *eval(Obj *exp, Frame *env) {
 				if (done) {
 					continue;
 				} else {
-					return err("procedure-apply", "no match", cdr(lst));
+					err("procedure-apply", "no match", cdr(lst));
 				}
 			}
 			return apply(car(lst), cdr(lst));
 		}
 		break;
 	}
-	ASSERT(false, "eval");
+	err("eval", "unknown", exp);
+	return nullptr;
 }

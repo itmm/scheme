@@ -35,16 +35,9 @@ class Error : public Obj {
 		}
 };
 
-Obj *err(const std::string fn, const std::string msg, Obj *exp1 = nullptr, Obj *exp2 = nullptr) {
-	auto er { new Error { fn, msg, exp1, exp2 } };
-	if (err_stream) { *err_stream << er << '\n'; }
-	return er;
+void err(const std::string fn, const std::string msg, Obj *exp1 = nullptr, Obj *exp2 = nullptr) {
+	throw new Error { fn, msg, exp1, exp2 };
 }
 
-#define ASSERT(CND, FN) if (! (CND)) { return err((FN), "no " #CND); }
+#define ASSERT(CND, FN) if (! (CND)) { err((FN), "no " #CND); }
 
-bool is_err(Obj *obj) {
-	return dynamic_cast<Error *>(obj);
-}
-
-bool is_good(Obj *obj) { return ! is_err(obj); }

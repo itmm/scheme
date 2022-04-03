@@ -47,5 +47,8 @@ Obj *Frame::update(Symbol *key, Obj *value) {
 		return value;
 	} else if (next_) {
 		return next_->update(key, value);
-	} else return err("update", "not found", key);
+	} else {
+		err("update", "not found", key);
+		return nullptr;
+	}
 }
