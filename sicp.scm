@@ -29,9 +29,7 @@
    size
    (assert (= (* 5 size) 10))
 ))
-(define (== a b)
-   (define (abs x) (if (< x 0) (- x) x))
-   (< (abs (- a b) x) 0.0001))
+(define (== a b) (< (abs (- a b)) 0.0001))
 ((lambda ()
    (define pi 3.14159)
    (define radius 10)
