@@ -14,6 +14,9 @@
 (define (> a b)
   (< b a))
 (define (not a) (if a #f #t))
+(define (abs x) (if (< x 0) (- x) x))
+(define (even? x) (= (remainder x 2) 0))
+(define (odd? x) (not (even? x)))
 
 (define + (lambda-case
 	   (() 0)
