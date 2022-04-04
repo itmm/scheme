@@ -56,7 +56,7 @@ std::ostream &Procedure::write(std::ostream &out) {
 		out << "(lambda " << cases_[0].args;
 		if (is_pair(cdr(cases_[0].body))) {
 			out << "\n  ";
-			write_inner_complex_pair(out, dynamic_cast<Pair *>(cdr(cases_[0].body)), " ");
+			write_inner_complex_pair(out, as_pair(cdr(cases_[0].body)), " ");
 		}
 		else {
 			out << " . " << cdr(cases_[0].body);
@@ -118,9 +118,9 @@ Obj *Procedure::get_body(Procedure_Case &c) {
 
 bool matches(Obj *args, Obj *values) {
 	if (! args) { return values == nullptr; }
-	auto pa { dynamic_cast<Pair *>(args) };
+	auto pa { as_pair(args) };
 	if (! pa) { return true; }
-	auto pv { dynamic_cast<Pair *>(values) };
+	auto pv { as_pair(values) };
 	if (! pv) { return false; }
 	return matches(cdr(pa), cdr(pv));
 
@@ -158,7 +158,7 @@ Obj *apply(Obj *op, Obj *operands) {
 Obj *eval_list(Obj *exp, Frame *env) {
 	if (! exp) { return exp; }
 	auto head { eval(car(exp), env) };
-	auto rest { dynamic_cast<Pair *>(cdr(exp)) };
+	auto rest { as_pair(cdr(exp)) };
 	if (rest) {
 		return new Pair { head, eval_list(rest, env) };
 	} else {
@@ -185,11 +185,11 @@ inline bool is_define_syntax_special(Obj *lst) {
 
 inline Obj *define_key(Pair *lst) {
 	auto first { cadr(lst) };
-	auto sym { dynamic_cast<Symbol *>(first) };
+	auto sym { as_symbol(first) };
 	if (sym) { return sym; }
-	auto args { dynamic_cast<Pair *>(first) };
+	auto args { as_pair(first) };
 	if (args) {
-		auto name { dynamic_cast<Symbol *>(car(args)) };
+		auto name { as_symbol(car(args)) };
 		ASSERT(name, "define_key");
 		return name;
 	}
@@ -198,7 +198,7 @@ inline Obj *define_key(Pair *lst) {
 }
 
 inline Obj *define_value(Pair *lst, Frame *env) {
-	auto args { dynamic_cast<Pair *>(cadr(lst)) };
+	auto args { as_pair(cadr(lst)) };
 	if (args) {
 		return new Procedure { cdr(args), cddr(lst), env };
 	} else {
@@ -252,7 +252,7 @@ Obj *build_cond(Obj *lst) {
 	auto expr { car(lst) };
 	auto cond { car(expr) };
 	auto cons { cdr(expr) };
-	auto sym { dynamic_cast<Symbol *>(cond) };
+	auto sym { as_symbol(cond) };
 	if (sym && sym->value() == "else") {
 		if (cdr(lst)) {
 			err("cond", "else not in last case");
@@ -305,7 +305,7 @@ Obj *build_let_vals(Obj *arg_vals, Obj *vals) {
 
 Obj *build_let(Obj *lst) {
 	lst = cdr(lst);
-	auto name { dynamic_cast<Symbol *>(car(lst)) };
+	auto name { as_symbol(car(lst)) };
 	if (name) { lst = cdr(lst); };
 	auto arg_vals { car(lst) };
 	auto block { cdr(lst) };
@@ -316,11 +316,6 @@ Obj *build_let(Obj *lst) {
 		new Pair { args, block }
 	}};
 	if (name) {
-		// (let name ((a 2) (b 3)) x y)
-		// ((lambda (name) (name 2 3)) (lambda (a b) x y))
-		// ((lambda (name) (set! name (lambda (a b) x y)) (name 2 3)) #f)
-		// ((lambda (a b) x y) 2 3)
-
 		auto inner_arg = new Pair { name, nullptr };
 		auto inner_set = new Pair { 
 			Symbol::get("set!"),
@@ -383,8 +378,8 @@ class Active_Guard {
 };
 
 bool evals_to_self(Obj *obj) {
-	if (dynamic_cast<Symbol *>(obj)) { return false; }
-	if (dynamic_cast<Pair *>(obj)) { return false; }
+	if (is_symbol(obj)) { return false; }
+	if (is_pair(obj)) { return false; }
 	return true;
 }
 
@@ -402,15 +397,15 @@ class Syntax : public Obj {
 		std::set<std::string> keywords_;
 		std::vector<Syntax_Rule> rules_;
 		bool is_repeating(Obj *cur) {
-			auto nxt { dynamic_cast<Pair *>(cdr(cur)) };
+			auto nxt { as_pair(cdr(cur)) };
 			if (! nxt) { return false; }
-			auto sym { dynamic_cast<Symbol *>(car(nxt)) };
+			auto sym { as_symbol(car(nxt)) };
 			return sym && sym->value() == "...";
 		}
 		Frame *match_one(Obj *pattern, Obj *value, Frame *match, bool repeating) {
-			auto pair { dynamic_cast<Pair *>(pattern) };
+			auto pair { as_pair(pattern) };
 			if (pair) {
-				auto vp { dynamic_cast<Pair *>(value) };
+				auto vp { as_pair(value) };
 				if (! vp) { return nullptr; }
 				return match_rest(pair, vp, match, repeating);
 			}
@@ -545,11 +540,11 @@ Obj *eval(Obj *exp, Frame *env) {
 	Active_Guard exp_guard { &exp };
 	for (;;) {
 		if (evals_to_self(exp)) { return exp; }
-		auto sym_value { dynamic_cast<Symbol *>(exp) };
+		auto sym_value { as_symbol(exp) };
 		if (sym_value) {
 			return env->has(sym_value->value()) ? env->get(sym_value->value()) : exp;
 		}
-		auto lst_value { dynamic_cast<Pair *>(exp) };
+		auto lst_value { as_pair(exp) };
 		if (lst_value) {
 			auto se { find_syntax_extension(lst_value) };
 			if (se) {
@@ -557,32 +552,32 @@ Obj *eval(Obj *exp, Frame *env) {
 				continue;
 			}
 			if (is_define_special(lst_value)) {
-				auto key { dynamic_cast<Symbol *>(define_key(lst_value)) };
+				auto key { as_symbol(define_key(lst_value)) };
 				auto value { define_value(lst_value, env) };
 				ASSERT(key, "define");
 				env->insert(key->value(), value);
 				return value;
 			}
 			if (is_define_syntax_special(lst_value)) {
-				auto name { dynamic_cast<Symbol *>(cadr(lst_value)) };
-				auto rules { dynamic_cast<Pair *>(caddr(lst_value)) };
+				auto name { as_symbol(cadr(lst_value)) };
+				auto rules { as_pair(caddr(lst_value)) };
 				ASSERT(name && rules && ! cdddr(lst_value), "syntax-rules");
 				ASSERT(is_tagged_list(rules, "syntax-rules"), "ysyntax-rules");
 				auto se { new Syntax { name->value() } };
 				auto keywords { cadr(rules) };
 				for (; keywords; keywords = cdr(keywords)) {
 					ASSERT(is_pair(keywords), "syntax-rules");
-					auto sym { dynamic_cast<Symbol *>(car(keywords)) };
+					auto sym { as_symbol(car(keywords)) };
 					ASSERT(sym, "syntax-rules");
 					se->add_keyword(sym->value());
 				}
 				auto cur { cddr(rules) };
 				for (; cur; cur = cdr(cur)) {
 					ASSERT(is_pair(cur), "syntax-rules");
-					auto rule { dynamic_cast<Pair *>(car(cur)) };
+					auto rule { as_pair(car(cur)) };
 					ASSERT(rule, "syntax-rules");
-					auto pattern { dynamic_cast<Pair *>(car(rule)) };
-					auto replacement { dynamic_cast<Pair *>(cadr(rule)) };
+					auto pattern { as_pair(car(rule)) };
+					auto replacement { as_pair(cadr(rule)) };
 					ASSERT(pattern && replacement && ! cddr(rule), "syntax-rules");
 					se->add_rule(pattern, replacement);
 				}
@@ -598,7 +593,7 @@ Obj *eval(Obj *exp, Frame *env) {
 				auto cases { case_lambda_cases(lst_value) };
 				auto proc { new Procedure(env) };
 				for (; is_pair(cases) && is_pair(car(cases)); cases = cdr(cases)) {
-					auto pair { dynamic_cast<Pair *>(car(cases)) };
+					auto pair { as_pair(car(cases)) };
 					proc->add_case(car(pair), cdr(pair));
 				}
 				return proc;
@@ -657,7 +652,7 @@ Obj *eval(Obj *exp, Frame *env) {
 			}
 			if (is_set_special(lst_value)) {
 				ASSERT(is_valid_set(lst_value), "set!");
-				auto sym { dynamic_cast<Symbol *>(set_var(lst_value)) };
+				auto sym { as_symbol(set_var(lst_value)) };
 				auto val { eval(set_value(lst_value), env) };
 				if (sym) {
 					return env->update(sym, val);

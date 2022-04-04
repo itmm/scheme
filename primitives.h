@@ -13,10 +13,6 @@ class One_Primitive : public Primitive {
 		}
 };
 
-bool is_symbol(Obj *obj) {
-	return dynamic_cast<Symbol *>(obj) != nullptr;
-}
-
 class Predicate : public One_Primitive {
 	protected:
 		virtual bool is_true(Obj *arg) = 0;
@@ -87,9 +83,8 @@ class Apply_Primitive: public Primitive {
 		}
 };
 
-bool is_numeric(Obj *arg) {
-	return dynamic_cast<Numeric *>(arg) != nullptr;
-}
+inline auto as_numeric(Obj *obj) { return dynamic_cast<Numeric *>(obj); }
+inline bool is_numeric(Obj *obj) { return as_numeric(obj); }
 
 class Numeric_Primitive : public Predicate {
 	protected:
@@ -136,8 +131,8 @@ class Div_Primitive : public Two_Primitive {
 class Remainder_Primitive : public Two_Primitive {
 	protected:
 		Obj *apply_two(Obj *first, Obj *second) override {
-			auto a { dynamic_cast<Integer *>(first) };
-			auto b { dynamic_cast<Integer *>(second) };
+			auto a { as_integer(first) };
+			auto b { as_integer(second) };
 			ASSERT(a && b, "remainder");
 			return remainder(a, b);
 		}
@@ -207,8 +202,8 @@ class Eqv_Primitive : public Binary_Predicate {
 		bool is_true(Obj *first, Obj *second) override {
 			if (first == second) { return true; }
 			if (::is_true(is_equal_num(first, second))) { return true; }
-			auto as { dynamic_cast<String *>(first) };
-			auto bs { dynamic_cast<String *>(second) };
+			auto as { as_string(first) };
+			auto bs { as_string(second) };
 			if (as && bs && as->value() == bs->value()) { return true; }
 			return false;
 		}
@@ -255,7 +250,7 @@ class Is_Negative_Primitive: public Predicate {
 class Set_Car_Primitive : public Two_Primitive {
 	protected:
 		Obj *apply_two(Obj *first, Obj *second) override {
-			auto pair { dynamic_cast<Pair *>(first) };
+			auto pair { as_pair(first) };
 			ASSERT(pair, "set-car!");
 			pair->set_head(second);
 			return second;
@@ -265,7 +260,7 @@ class Set_Car_Primitive : public Two_Primitive {
 class Set_Cdr_Primitive : public Two_Primitive {
 	protected:
 		Obj *apply_two(Obj *first, Obj *second) override {
-			auto pair { dynamic_cast<Pair *>(first) };
+			auto pair { as_pair(first) };
 			ASSERT(pair, "set-cdr!");
 			pair->set_rest(second);
 			return second;

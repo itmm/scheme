@@ -23,6 +23,9 @@ class String : public Value_Element<std::string> {
 		}
 };
 
+inline String *as_string(Obj *obj) { return dynamic_cast<String *>(obj); }
+inline bool is_string(Obj *obj) { return as_string(obj); }
+
 #include <map>
 
 class Symbol : public Obj {
@@ -49,6 +52,9 @@ class Symbol : public Obj {
 };
 
 std::map<std::string, Symbol *> Symbol::symbols_;
+
+inline Symbol *as_symbol(Obj *obj) { return dynamic_cast<Symbol *>(obj); }
+inline bool is_symbol(Obj *obj) { return as_symbol(obj); }
 
 #include "num.h"
 
@@ -99,37 +105,28 @@ class Pair : public Obj {
 		std::ostream &write(std::ostream &out) override;
 };
 
-Obj *car(Obj *lst) {
-	auto pair { dynamic_cast<Pair *>(lst) };
+inline Pair *as_pair(Obj *obj) { return dynamic_cast<Pair *>(obj); }
+inline bool is_pair(Obj *obj) { return as_pair(obj); }
+inline bool is_null(Obj *element) { return ! element; }
+
+Obj *car(Obj *obj) {
+	auto pair { as_pair(obj) };
 	ASSERT(pair, "car");
 	return pair->head();
 }
 
-Obj *cdr(Obj *lst) {
-	auto pair { dynamic_cast<Pair *>(lst) };
+Obj *cdr(Obj *obj) {
+	auto pair { as_pair(obj) };
 	ASSERT(pair, "cdr");
 	return pair->rest();
 }
 
-Obj *cadr(Obj *lst) { return car(cdr(lst)); }
-
-Obj *cddr(Obj *lst) { return cdr(cdr(lst)); }
-
-Obj *caddr(Obj *lst) { return car(cddr(lst)); }
-
-Obj *cdddr(Obj *lst) { return cdr(cddr(lst)); }
-
-Obj *cadddr(Obj *lst) { return car(cdddr(lst)); }
-
-Obj *cddddr(Obj *lst) { return cdr(cdddr(lst)); }
-
-bool is_null(Obj *element) {
-	return ! element;
-}
-
-bool is_pair(Obj *elm) {
-	return dynamic_cast<Pair *>(elm);
-}
+Obj *cadr(Obj *obj) { return car(cdr(obj)); }
+Obj *cddr(Obj *obj) { return cdr(cdr(obj)); }
+Obj *caddr(Obj *obj) { return car(cddr(obj)); }
+Obj *cdddr(Obj *obj) { return cdr(cddr(obj)); }
+Obj *cadddr(Obj *obj) { return car(cdddr(obj)); }
+Obj *cddddr(Obj *obj) { return cdr(cdddr(obj)); }
 
 bool is_complex(Obj *elm) {
 	int i { 0 };
@@ -148,7 +145,7 @@ void write_simple_pair(std::ostream &out, Pair *pair) {
 		if (first) { first = false; } else { out << ' '; }
 		out << car(cur);
 		auto nxt { cdr(cur) };
-		auto nxt_pair { dynamic_cast<Pair *>(nxt) };
+		auto nxt_pair { as_pair(nxt) };
 		if (nxt && ! nxt_pair) {
 			out << " . " << nxt;
 		}
@@ -162,7 +159,7 @@ void write_complex_pair(std::ostream &out, Pair *pair, std::string indent);
 void write_inner_complex_pair(std::ostream &out, Pair *pair, std::string indent) {
 	auto first { car(pair) };
 	out << first;
-	auto sym { dynamic_cast<Symbol *>(first) };
+	auto sym { as_symbol(first) };
 	bool no_newline { false };
 	if (sym) {
 		for (unsigned i { 0 }; i <= sym->value().length(); ++i) {
@@ -180,7 +177,7 @@ void write_inner_complex_pair(std::ostream &out, Pair *pair, std::string indent)
 			out << '\n' << indent;
 		}
 		auto value { car(cur) };
-		auto val_pair { dynamic_cast<Pair *>(value) };
+		auto val_pair { as_pair(value) };
 		if (! value) {
 			out << "()";
 		} else if (val_pair) {
@@ -202,7 +199,7 @@ void write_complex_pair(std::ostream &out, Pair *pair, std::string indent) {
 }
 
 std::ostream &Pair::write(std::ostream &out) {
-	auto sym { dynamic_cast<Symbol *>(head_) };
+	auto sym { as_symbol(head_) };
 	if (sym && sym->value() == "quote") {
 		out << "'";
 		return car(rest_)->write(out);

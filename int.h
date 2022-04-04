@@ -63,6 +63,9 @@ class Integer : public Numeric {
 		}
 };
 
+inline auto as_integer(Obj *obj) { return dynamic_cast<Integer *>(obj); }
+inline bool is_integer(Obj *obj) { return as_integer(obj); }
+
 class Negative_Integer : public Integer {
 	public:
 		Negative_Integer(const Digits &digits): Integer { digits } { }
@@ -197,10 +200,6 @@ bool int_eq(Integer *a, Integer *b) {
 	return true;
 }
 
-bool is_int(Obj *a) {
-	return dynamic_cast<Integer *>(a);
-}
-
 static Integer *int_half(Integer *num) {
 	Integer::Digits result;
 	result.resize(num->digits().size());
@@ -226,7 +225,7 @@ Integer *int_div(Integer *a, Integer *b) {
 
 	for (;;) {
 		auto prod { int_mult(max, b) };
-		if (int_eq(prod, a)) { return dynamic_cast<Integer *>(max); }
+		if (int_eq(prod, a)) { return as_integer(max); }
 		if (! int_less(prod, a)) { break; }
 		max = int_mult(max, max);
 	}

@@ -8,6 +8,9 @@ class Numeric : public Obj { };
 
 using Float = Value_Element<double, Numeric>;
 
+inline auto as_float(Obj *obj) { return dynamic_cast<Float *>(obj); }
+inline bool is_float(Obj *obj) { return as_float(obj); }
+
 class Fraction : public Numeric {
 		Integer *num_;
 		Integer *denom_;
@@ -28,6 +31,9 @@ class Fraction : public Numeric {
 Obj *negate(Obj *a);
 bool is_zero(Obj *a);
 bool is_negative(Obj *a);
+
+inline auto as_fraction(Obj *obj) { return dynamic_cast<Fraction *>(obj); }
+inline bool is_fraction(Obj *obj) { return as_fraction(obj); }
 
 bool is_fraction(const std::string &value) {
 	return value.find('/') != std::string::npos;
@@ -105,6 +111,9 @@ class Exact_Complex : public Numeric {
 		}
 };
 
+inline auto as_exact_complex(Obj *obj) { return dynamic_cast<Exact_Complex *>(obj); }
+inline bool is_exact_complex(Obj *obj) { return as_exact_complex(obj); }
+
 Obj *Exact_Complex::create(Obj *real, Obj *imag) {
 	if (is_zero(imag)) { return real; }
 	return create_forced(real, imag);
@@ -149,6 +158,9 @@ class Inexact_Complex : public Numeric {
 		}
 };
 
+inline auto as_inexact_complex(Obj *obj) { return dynamic_cast<Inexact_Complex *>(obj); }
+inline bool is_inexact_complex(Obj *obj) { return as_inexact_complex(obj); }
+
 Obj *Inexact_Complex::create(const num_type &value) {
 	if (value.imag() == 0.0) {
 		return new Float { value.real() };
@@ -158,8 +170,8 @@ Obj *Inexact_Complex::create(const num_type &value) {
 
 Obj *Inexact_Complex::create(const std::string &value) {
 	auto pair { create_complex_pair(value) };
-	auto real { dynamic_cast<Float *>(pair.first) };
-	auto imag { dynamic_cast<Float *>(pair.second) };
+	auto real { as_float(pair.first) };
+	auto imag { as_float(pair.second) };
 	ASSERT(real && imag, "create complex");
 	return create(num_type { real->value(), imag->value() });
 }
@@ -179,15 +191,15 @@ class Single_Propagate {
 		virtual R apply_else(Obj *a) = 0;
 	public:
 		R propagate(Obj *a) {
-			auto ai { dynamic_cast<Integer *>(a) };
+			auto ai { as_integer(a) };
 			if (ai) { return apply_int(ai); }
-			auto af { dynamic_cast<Fraction *>(a) };
+			auto af { as_fraction(a) };
 			if (af) { return apply_fract(af); }
-			auto ar { dynamic_cast<Float *>(a) };
+			auto ar { as_float(a) };
 			if (ar) { return apply_real(ar); }
-			auto aec { dynamic_cast<Exact_Complex *>(a) };
+			auto aec { as_exact_complex(a) };
 			if (aec) { return apply_exact_complex(aec); }
-			auto aic { dynamic_cast<Inexact_Complex *>(a) };
+			auto aic { as_inexact_complex(a) };
 			if (aic) { return apply_inexact_complex(aic); }
 			return apply_else(a);
 		}
@@ -257,18 +269,18 @@ class Propagate {
 };
 
 Obj *Propagate::propagate(Obj *a, Obj *b) {
-	auto ai { dynamic_cast<Integer *>(a) };
-	auto bi { dynamic_cast<Integer *>(b) };
+	auto ai { as_integer(a) };
+	auto bi { as_integer(b) };
 	if (ai && bi) { return apply_int(ai, bi); }
-	auto afr { dynamic_cast<Fraction *>(a) };
-	auto bfr { dynamic_cast<Fraction *>(b) };
+	auto afr { as_fraction(a) };
+	auto bfr { as_fraction(b) };
 	if (afr || bfr) {
-		if (! afr && ai) { afr = Fraction::create_forced(ai, dynamic_cast<Integer *>(one)); }
-		if (! bfr && bi) { bfr = Fraction::create_forced(bi, dynamic_cast<Integer *>(one)); }
+		if (! afr && ai) { afr = Fraction::create_forced(ai, as_integer(one)); }
+		if (! bfr && bi) { bfr = Fraction::create_forced(bi, as_integer(one)); }
 			if (afr && bfr) { return apply_fract(afr, bfr); }
 	}
-	auto afl { dynamic_cast<Float *>(a) };
-	auto bfl { dynamic_cast<Float *>(b) };
+	auto afl { as_float(a) };
+	auto bfl { as_float(b) };
 	if (afl || bfl) {
 		if (! afl) {
 			if (ai) { afl = new Float { ai->float_value() }; }
@@ -280,8 +292,8 @@ Obj *Propagate::propagate(Obj *a, Obj *b) {
 		}
 		if (afl && bfl) { return apply_float(afl, bfl); }
 	}
-	auto aec { dynamic_cast<Exact_Complex *>(a) };
-	auto bec { dynamic_cast<Exact_Complex *>(b) };
+	auto aec { as_exact_complex(a) };
+	auto bec { as_exact_complex(b) };
 	if (aec || bec) {
 		if (! aec) {
 			if (ai) { aec = Exact_Complex::create_forced(ai, zero); }
@@ -293,8 +305,8 @@ Obj *Propagate::propagate(Obj *a, Obj *b) {
 		}
 		if (aec && bec) { return apply_exact_complex(aec, bec); }
 	}
-	auto aic { dynamic_cast<Inexact_Complex *>(a) };
-	auto bic { dynamic_cast<Inexact_Complex *>(b) };
+	auto aic { as_inexact_complex(a) };
+	auto bic { as_inexact_complex(b) };
 	if (aic || bic) {
 		if (! aic) {
 			if (ai) { aic = Inexact_Complex::create_forced({ ai->float_value(), 0.0 }); }
@@ -561,7 +573,7 @@ Fraction *Fraction::create_forced(Integer *num, Integer *denom) {
 		return create_forced(num->negate(), denom)->negate();
 	}
 
-	auto g { dynamic_cast<Integer *>(gcd(num, denom)) };
+	auto g { as_integer(gcd(num, denom)) };
 	if (num && denom && g && is_false(is_equal_num(g, one))) {
 		num = int_div(num, g);
 		denom = int_div(denom, g);
@@ -578,10 +590,10 @@ Obj *Fraction::create(Obj *num, Obj *denom) {
 		return ::negate(create(::negate(num), denom));
 	}
 
-	auto ni { dynamic_cast<Integer *>(num) };
-	auto di { dynamic_cast<Integer *>(denom) };
+	auto ni { as_integer(num) };
+	auto di { as_integer(denom) };
 	ASSERT(ni && di, "fraction");
-	auto g { dynamic_cast<Integer *>(gcd(ni, di)) };
+	auto g { as_integer(gcd(ni, di)) };
 	if (g && is_false(is_equal_num(g, one))) {
 		ni = int_div(ni, g);
 		di = int_div(di, g);
