@@ -4,14 +4,30 @@
 
 class Numeric : public Obj { };
 
+constexpr auto is_numeric = Dynamic::is<Numeric>;
+
+class Exact_Numeric : public Numeric { };
+
+constexpr auto is_exact = Dynamic::is<Exact_Numeric>;
+
+class Inexact_Numeric : public Numeric { };
+
+constexpr auto is_inexact = Dynamic::is<Inexact_Numeric>;
+
+struct Complex_Numeric {
+	virtual ~Complex_Numeric() { }
+};
+
+constexpr auto is_complex = Dynamic::is<Complex_Numeric>;
+
 #include "int.h"
 
-using Float = Value_Element<double, Numeric>;
+using Float = Value_Element<double, Inexact_Numeric>;
 
-inline auto as_float(Obj *obj) { return dynamic_cast<Float *>(obj); }
-inline bool is_float(Obj *obj) { return as_float(obj); }
+constexpr auto as_float = Dynamic::as<Float>;
+constexpr auto is_float = Dynamic::is<Float>;
 
-class Fraction : public Numeric {
+class Fraction : public Exact_Numeric {
 		Integer *num_;
 		Integer *denom_;
 		Fraction(Integer *num, Integer *denom): num_ { num }, denom_ { denom } { }
@@ -28,14 +44,14 @@ class Fraction : public Numeric {
 		Fraction *negate() { return new Fraction { num_->negate(), denom_ }; }
 };
 
+constexpr auto as_fraction = Dynamic::as<Fraction>;
+constexpr auto is_fraction = Dynamic::is<Fraction>;
+
 Obj *negate(Obj *a);
 bool is_zero(Obj *a);
 bool is_negative(Obj *a);
 
-inline auto as_fraction(Obj *obj) { return dynamic_cast<Fraction *>(obj); }
-inline bool is_fraction(Obj *obj) { return as_fraction(obj); }
-
-bool is_fraction(const std::string &value) {
+bool is_fraction_str(const std::string &value) {
 	return value.find('/') != std::string::npos;
 }
 
@@ -46,7 +62,7 @@ bool is_real(const std::string &value) {
 double float_value(const std::string &v);
 
 Obj *create_uncomplex(const std::string &value) {
-	if (is_fraction(value)) {
+	if (is_fraction_str(value)) {
 		return Fraction::create(value);
 	} else if (is_real(value)) {
 		return new Float(float_value(value));
@@ -85,7 +101,7 @@ std::pair<Obj *, Obj *> create_complex_pair(const std::string &value) {
 	};
 }
 
-class Exact_Complex : public Numeric {
+class Exact_Complex : public Exact_Numeric, public Complex_Numeric {
 		Obj *real_;
 		Obj *imag_;
 		Exact_Complex(Obj *real, Obj *imag): real_ { real }, imag_ { imag } { }
@@ -111,8 +127,8 @@ class Exact_Complex : public Numeric {
 		}
 };
 
-inline auto as_exact_complex(Obj *obj) { return dynamic_cast<Exact_Complex *>(obj); }
-inline bool is_exact_complex(Obj *obj) { return as_exact_complex(obj); }
+constexpr auto as_exact_complex = Dynamic::as<Exact_Complex>;
+constexpr auto is_exact_complex = Dynamic::is<Exact_Complex>;
 
 Obj *Exact_Complex::create(Obj *real, Obj *imag) {
 	if (is_zero(imag)) { return real; }
@@ -130,7 +146,7 @@ Exact_Complex *Exact_Complex::create_forced(Obj *real, Obj *imag) {
 
 #include <complex>
 
-class Inexact_Complex : public Numeric {
+class Inexact_Complex : public Inexact_Numeric, public Complex_Numeric {
 		using num_type = std::complex<double>;
 		num_type value_;
 		Inexact_Complex(const num_type &value): value_ { value } { }
@@ -158,8 +174,8 @@ class Inexact_Complex : public Numeric {
 		}
 };
 
-inline auto as_inexact_complex(Obj *obj) { return dynamic_cast<Inexact_Complex *>(obj); }
-inline bool is_inexact_complex(Obj *obj) { return as_inexact_complex(obj); }
+constexpr auto as_inexact_complex = Dynamic::as<Inexact_Complex>;
+constexpr auto is_inexact_complex = Dynamic::is<Inexact_Complex>;
 
 Obj *Inexact_Complex::create(const num_type &value) {
 	if (value.imag() == 0.0) {

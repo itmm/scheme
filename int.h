@@ -2,7 +2,7 @@
  * big integer type
  */
 
-class Integer : public Numeric {
+class Integer : public Exact_Numeric {
 	public:
 		using Digits = std::vector<unsigned short>;
 	private:
@@ -63,8 +63,8 @@ class Integer : public Numeric {
 		}
 };
 
-inline auto as_integer(Obj *obj) { return dynamic_cast<Integer *>(obj); }
-inline bool is_integer(Obj *obj) { return as_integer(obj); }
+constexpr auto as_integer = Dynamic::as<Integer>;
+constexpr auto is_integer = Dynamic::is<Integer>;
 
 class Negative_Integer : public Integer {
 	public:

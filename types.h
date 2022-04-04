@@ -23,8 +23,13 @@ class String : public Value_Element<std::string> {
 		}
 };
 
-inline auto as_string(Obj *obj) { return dynamic_cast<String *>(obj); }
-inline bool is_string(Obj *obj) { return as_string(obj); }
+namespace Dynamic {
+	template<typename C> C *as(Obj *obj) { return dynamic_cast<C *>(obj); }
+	template<typename C> bool is(Obj *obj) { return as<C>(obj); }
+}
+
+constexpr auto as_string = Dynamic::as<String>;
+constexpr auto is_string = Dynamic::is<String>;
 
 #include <map>
 
@@ -53,8 +58,8 @@ class Symbol : public Obj {
 
 std::map<std::string, Symbol *> Symbol::symbols_;
 
-inline auto as_symbol(Obj *obj) { return dynamic_cast<Symbol *>(obj); }
-inline bool is_symbol(Obj *obj) { return as_symbol(obj); }
+constexpr auto as_symbol = Dynamic::as<Symbol>;
+constexpr auto is_symbol = Dynamic::is<Symbol>;
 
 #include "num.h"
 
@@ -105,8 +110,8 @@ class Pair : public Obj {
 		std::ostream &write(std::ostream &out) override;
 };
 
-inline auto as_pair(Obj *obj) { return dynamic_cast<Pair *>(obj); }
-inline bool is_pair(Obj *obj) { return as_pair(obj); }
+constexpr auto as_pair = Dynamic::as<Pair>;
+constexpr auto is_pair = Dynamic::is<Pair>;
 inline bool is_null(Obj *element) { return ! element; }
 
 Obj *car(Obj *obj) {
@@ -128,7 +133,7 @@ Obj *cdddr(Obj *obj) { return cdr(cddr(obj)); }
 Obj *cadddr(Obj *obj) { return car(cdddr(obj)); }
 Obj *cddddr(Obj *obj) { return cdr(cdddr(obj)); }
 
-bool is_complex(Obj *elm) {
+bool is_complicated(Obj *elm) {
 	int i { 0 };
 	for (Obj *cur { elm }; is_pair(cur); cur = cdr(cur), ++i) {
 		auto val { car(cur) };
@@ -181,7 +186,7 @@ void write_inner_complex_pair(std::ostream &out, Pair *pair, std::string indent)
 		if (! value) {
 			out << "()";
 		} else if (val_pair) {
-			if (is_complex(val_pair)) {
+			if (is_complicated(val_pair)) {
 				write_complex_pair(out, val_pair, indent);
 			} else {
 				write_simple_pair(out, val_pair);
@@ -205,7 +210,7 @@ std::ostream &Pair::write(std::ostream &out) {
 		return car(rest_)->write(out);
 	}
 
-	if (is_complex(this)) {
+	if (is_complicated(this)) {
 		write_complex_pair(out, this, "");
 	} else {
 		write_simple_pair(out, this);

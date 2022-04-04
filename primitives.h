@@ -28,6 +28,13 @@ class Symbol_Primitive : public Predicate {
 		}
 };
 
+class Complex_Primitive : public Predicate {
+	protected:
+		bool is_true(Obj *arg) override {
+			return is_complex(arg);
+		}
+};
+
 class Car_Primitive : public One_Primitive {
 	protected:
 		Obj *apply_one(Obj *arg) override { return car(arg); }
@@ -82,9 +89,6 @@ class Apply_Primitive: public Primitive {
 			return ::apply(proc, lst);
 		}
 };
-
-inline auto as_numeric(Obj *obj) { return dynamic_cast<Numeric *>(obj); }
-inline bool is_numeric(Obj *obj) { return as_numeric(obj); }
 
 class Numeric_Primitive : public Predicate {
 	protected:
@@ -271,6 +275,7 @@ Frame initial_frame { nullptr };
 
 void setup_primitives() {
 	initial_frame.insert("symbol?", new Symbol_Primitive());
+	initial_frame.insert("complex?", new Complex_Primitive());
 	initial_frame.insert("pair?", new Pair_Primitive());
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());

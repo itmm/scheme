@@ -9,8 +9,8 @@ class Function : public Obj {
 		virtual Obj *apply(Obj *args) = 0;
 };
 
-inline auto as_function(Obj *obj) { return dynamic_cast<Function *>(obj); }
-inline bool is_function(Obj *obj) { return as_function(obj); }
+constexpr auto as_function = Dynamic::as<Function>;
+constexpr auto is_function = Dynamic::is<Function>;
 
 class Primitive : public Function {
 	public:
@@ -58,8 +58,8 @@ class Procedure : public Function {
 		std::ostream &write(std::ostream &out) override;
 };
 
-inline auto as_procedure(Obj *obj) { return dynamic_cast<Procedure *>(obj); }
-inline bool is_procedure(Obj *obj) { return as_procedure(obj); }
+constexpr auto as_procedure = Dynamic::as<Procedure>;
+constexpr auto is_procedure = Dynamic::is<Procedure>;
 
 std::ostream &Procedure::write(std::ostream &out) {
 	if (cases_.size() == 1) {
