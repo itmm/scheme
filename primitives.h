@@ -286,12 +286,12 @@ void setup_primitives() {
 	initial_frame.insert("@binary/", new Div_Primitive());
 	initial_frame.insert("@negate", new Negate_Primitive());
 	initial_frame.insert("@negative?", new Is_Negative_Primitive());
-	initial_frame.insert("<", new Less_Primitive());
-	initial_frame.insert("=", new Equal_Primitive());
+	initial_frame.insert("@binary<", new Less_Primitive());
+	initial_frame.insert("@binary=", new Equal_Primitive());
 	initial_frame.insert("apply", new Apply_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
-	initial_frame.insert("eq?", new Eq_Primitive());
-	initial_frame.insert("eqv?", new Eqv_Primitive());
+	initial_frame.insert("@binary-eq?", new Eq_Primitive());
+	initial_frame.insert("@binary-eqv?", new Eqv_Primitive());
 	initial_frame.insert("remainder", new Remainder_Primitive());
 	initial_frame.insert("newline", new Newline_Primitive());
 	initial_frame.insert("print", new Print_Primitive());
