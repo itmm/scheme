@@ -18,22 +18,22 @@
 (define (even? x) (= (remainder x 2) 0))
 (define (odd? x) (not (even? x)))
 
-(define + (lambda-case
+(define + (case-lambda
 	   (() 0)
 	   ((a) a)
 	   ((a b) (@binary+ a b))
 	   (x (apply + (@binary+ (car x) (cadr x)) (cddr x)))))
-(define - (lambda-case
+(define - (case-lambda
 	   (() 0)
 	   ((a) (@binary- 0 a))
 	   ((a b) (@binary- a b))
 	   (x (apply - (@binary- (car x) (cadr x)) (cddr x)))))
-(define * (lambda-case
+(define * (case-lambda
 	   (() 1)
 	   ((a) a)
 	   ((a b) (@binary* a b))
 	   (x (apply * (@binary* (car x) (cadr x)) (cddr x)))))
-(define / (lambda-case
+(define / (case-lambda
 	   (() 1)
 	   ((a) (@binary/ 1 a))
 	   ((a b) (@binary/ a b))

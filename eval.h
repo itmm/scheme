@@ -219,11 +219,11 @@ inline Obj *lambda_body(Pair *lst) {
 	return cddr(lst);
 }
 
-inline bool is_lambda_case_special(Pair *lst) {
-	return is_tagged_list(lst, "lambda-case") && is_pair(cdr(lst));
+inline bool is_case_lambda_special(Pair *lst) {
+	return is_tagged_list(lst, "case-lambda") && is_pair(cdr(lst));
 }
 
-inline Obj *lambda_case_cases(Pair *lst) {
+inline Obj *case_lambda_cases(Pair *lst) {
 	return cdr(lst);
 }
 
@@ -594,8 +594,8 @@ Obj *eval(Obj *exp, Frame *env) {
 				auto body { lambda_body(lst_value) };
 				return new Procedure(args, body, env);
 			}
-			if (is_lambda_case_special(lst_value)) {
-				auto cases { lambda_case_cases(lst_value) };
+			if (is_case_lambda_special(lst_value)) {
+				auto cases { case_lambda_cases(lst_value) };
 				auto proc { new Procedure(env) };
 				for (; is_pair(cases) && is_pair(car(cases)); cases = cdr(cases)) {
 					auto pair { dynamic_cast<Pair *>(car(cases)) };
