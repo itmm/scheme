@@ -48,7 +48,10 @@ class Obj {
 
 		void make_active() { active_elements.push_back(this); }
 		void cease_active() {
-			active_elements.erase(find(active_elements.begin(), active_elements.end(), this));
+			active_elements.erase(find(
+				active_elements.begin(),
+				active_elements.end(), this
+			));
 		}
 };
 
