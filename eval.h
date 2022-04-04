@@ -4,9 +4,16 @@
  * also special forms are handled
  */
 
-class Primitive : public Obj {
+class Function : public Obj {
 	public:
 		virtual Obj *apply(Obj *args) = 0;
+};
+
+inline auto as_function(Obj *obj) { return dynamic_cast<Function *>(obj); }
+inline bool is_function(Obj *obj) { return as_function(obj); }
+
+class Primitive : public Function {
+	public:
 		std::ostream &write(std::ostream &out) override;
 
 };
@@ -21,7 +28,7 @@ struct Procedure_Case {
 	Obj *body;
 };
 
-class Procedure : public Obj {
+class Procedure : public Function {
 		Frame *env_;
 	protected:
 		void propagate_mark() override {
@@ -44,12 +51,15 @@ class Procedure : public Obj {
 			add_case(args, body);
 	       	}
 
-		Obj *build_env(Procedure_Case &c, Obj *arg_values);
+		Frame *build_env(Procedure_Case &c, Obj *arg_values);
 		Obj *get_body(Procedure_Case &c);
 
-		Obj *apply(Obj *arg_values);
+		Obj *apply(Obj *arg_values) override;
 		std::ostream &write(std::ostream &out) override;
 };
+
+inline auto as_procedure(Obj *obj) { return dynamic_cast<Procedure *>(obj); }
+inline bool is_procedure(Obj *obj) { return as_procedure(obj); }
 
 std::ostream &Procedure::write(std::ostream &out) {
 	if (cases_.size() == 1) {
@@ -70,7 +80,7 @@ std::ostream &Procedure::write(std::ostream &out) {
 }
 
 Symbol *assert_sym(Obj *elm) {
-	auto sym { dynamic_cast<Symbol *>(elm) };
+	auto sym { as_symbol(elm) };
 	if (! sym) { err("assert_sym", "no symbol", elm); }
 	return sym;
 }
@@ -93,7 +103,7 @@ class Frame_Guard {
 		~Frame_Guard() { reset(); }
 };
 
-Obj *Procedure::build_env(Procedure_Case &c, Obj *arg_values) {
+Frame *Procedure::build_env(Procedure_Case &c, Obj *arg_values) {
 	auto new_env { new Frame { env_ } };
 
 	Obj *cur { c.args };
@@ -133,7 +143,7 @@ bool case_matches(const Procedure_Case &c, Obj *arg_values) {
 Obj *Procedure::apply(Obj *arg_values) {
 	for (auto &c : cases_) {
 		if (case_matches(c, arg_values)) {
-			auto new_env { dynamic_cast<Frame *>(build_env(c, arg_values)) };
+			auto new_env { build_env(c, arg_values) };
 			ASSERT(new_env, "procedure apply");
 			{
 				Frame_Guard fg { new_env };
@@ -147,12 +157,9 @@ Obj *Procedure::apply(Obj *arg_values) {
 }
 
 Obj *apply(Obj *op, Obj *operands) {
-	auto prim { dynamic_cast<Primitive *>(op) };
-	if (prim) { return prim->apply(operands); }
-	auto proc { dynamic_cast<Procedure *>(op) };
-	if (proc) { return proc->apply(operands); }
-	err("apply", "unknown operation", op);
-	return nullptr;
+	auto fn { as_function(op) };
+	ASSERT(fn, "apply");
+	return fn->apply(operands);
 }
 
 Obj *eval_list(Obj *exp, Frame *env) {
@@ -167,7 +174,7 @@ Obj *eval_list(Obj *exp, Frame *env) {
 }
 
 Symbol *first_symbol(Obj *lst) {
-	return dynamic_cast<Symbol *>(car(lst));
+	return as_symbol(car(lst));
 }
 
 bool is_tagged_list(Obj *lst, const std::string &tag) {
@@ -409,7 +416,7 @@ class Syntax : public Obj {
 				if (! vp) { return nullptr; }
 				return match_rest(pair, vp, match, repeating);
 			}
-			auto sym { dynamic_cast<Symbol *>(pattern) };
+			auto sym { as_symbol(pattern) };
 			if (sym) {
 				if (keywords_.find(sym->value()) != keywords_.end()) {
 					if (value == sym) {
@@ -668,12 +675,12 @@ Obj *eval(Obj *exp, Frame *env) {
 				return Symbol::get("ok");
 			}
 			auto lst { eval_list(lst_value, env) };
-			auto proc { dynamic_cast<Procedure *>(car(lst)) };
+			auto proc { as_procedure(car(lst)) };
 			if (proc) {
 				bool done { false };
 				for (auto &c : proc->cases_) {
 					if (case_matches(c, cdr(lst))) {
-						auto new_env { dynamic_cast<Frame *>(proc->build_env(c, cdr(lst))) };
+						auto new_env { proc->build_env(c, cdr(lst)) };
 						ASSERT(new_env, "eval apply");
 						env = new_env;
 						exp_guard.swap(proc->get_body(c));

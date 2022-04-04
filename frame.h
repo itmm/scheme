@@ -23,6 +23,9 @@ class Frame : public Obj {
 		}
 };
 
+inline auto as_frame(Obj *obj) { return dynamic_cast<Frame *>(obj); }
+inline bool is_frame(Obj *obj) { return as_frame(obj); }
+
 void Frame::insert(const std::string &key, Obj *value) {
 	elements_[key] = value;
 }

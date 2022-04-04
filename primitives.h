@@ -76,7 +76,7 @@ class Apply_Primitive: public Primitive {
 		Obj *apply(Obj *args) override {
 			ASSERT(is_pair(args), "apply");
 			auto proc { car(args) };
-			ASSERT(dynamic_cast<Procedure *>(proc) || dynamic_cast<Primitive *>(proc), "apply");
+			ASSERT(is_function(proc), "apply");
 			auto lst { build_arg_lst(cdr(args)) };
 			ASSERT(is_pair(lst), "apply");
 			return ::apply(proc, lst);

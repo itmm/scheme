@@ -23,7 +23,7 @@ class String : public Value_Element<std::string> {
 		}
 };
 
-inline String *as_string(Obj *obj) { return dynamic_cast<String *>(obj); }
+inline auto as_string(Obj *obj) { return dynamic_cast<String *>(obj); }
 inline bool is_string(Obj *obj) { return as_string(obj); }
 
 #include <map>
@@ -53,7 +53,7 @@ class Symbol : public Obj {
 
 std::map<std::string, Symbol *> Symbol::symbols_;
 
-inline Symbol *as_symbol(Obj *obj) { return dynamic_cast<Symbol *>(obj); }
+inline auto as_symbol(Obj *obj) { return dynamic_cast<Symbol *>(obj); }
 inline bool is_symbol(Obj *obj) { return as_symbol(obj); }
 
 #include "num.h"
@@ -105,7 +105,7 @@ class Pair : public Obj {
 		std::ostream &write(std::ostream &out) override;
 };
 
-inline Pair *as_pair(Obj *obj) { return dynamic_cast<Pair *>(obj); }
+inline auto as_pair(Obj *obj) { return dynamic_cast<Pair *>(obj); }
 inline bool is_pair(Obj *obj) { return as_pair(obj); }
 inline bool is_null(Obj *element) { return ! element; }
 

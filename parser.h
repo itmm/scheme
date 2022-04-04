@@ -68,7 +68,7 @@ Obj *read_list(std::istream &in, int closing) {
 	}
 
 	auto exp { read_expression(in) };
-	auto sym { dynamic_cast<Symbol *>(exp) };
+	auto sym { as_symbol(exp) };
 	if (sym && sym->value() == ".") {
 		auto result { read_expression(in) };
 		eat_space(in);
