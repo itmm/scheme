@@ -21,17 +21,10 @@ class Predicate : public One_Primitive {
 		}
 };
 
-class Symbol_Primitive : public Predicate {
+template<typename C> class Dynamic_Predicate : public Predicate {
 	protected:
 		bool is_true(Obj *arg) override { 
-			return is_symbol(arg);
-		}
-};
-
-class Complex_Primitive : public Predicate {
-	protected:
-		bool is_true(Obj *arg) override {
-			return is_complex(arg);
+			return Dynamic::is<C>(arg);
 		}
 };
 
@@ -87,20 +80,6 @@ class Apply_Primitive: public Primitive {
 			auto lst { build_arg_lst(cdr(args)) };
 			ASSERT(is_pair(lst), "apply");
 			return ::apply(proc, lst);
-		}
-};
-
-class Numeric_Primitive : public Predicate {
-	protected:
-		bool is_true(Obj *arg) override { 
-			return is_numeric(arg);
-		}
-};
-
-class Pair_Primitive : public Predicate {
-	protected:
-		bool is_true(Obj *arg) override {
-			return is_pair(arg);
 		}
 };
 
@@ -274,9 +253,10 @@ class Set_Cdr_Primitive : public Two_Primitive {
 Frame initial_frame { nullptr };
 
 void setup_primitives() {
-	initial_frame.insert("symbol?", new Symbol_Primitive());
-	initial_frame.insert("complex?", new Complex_Primitive());
-	initial_frame.insert("pair?", new Pair_Primitive());
+	initial_frame.insert("symbol?", new Dynamic_Predicate<Symbol>());
+	initial_frame.insert("numeric?", new Dynamic_Predicate<Numeric>());
+	initial_frame.insert("complex?", new Dynamic_Predicate<Complex_Numeric>());
+	initial_frame.insert("pair?", new Dynamic_Predicate<Pair>());
 	initial_frame.insert("car", new Car_Primitive());
 	initial_frame.insert("cdr", new Cdr_Primitive());
 	initial_frame.insert("cons", new Cons_Primitive());
@@ -297,6 +277,5 @@ void setup_primitives() {
 	initial_frame.insert("print", new Print_Primitive());
 	initial_frame.insert("set-car!", new Set_Car_Primitive());
 	initial_frame.insert("set-cdr!", new Set_Cdr_Primitive());
-	initial_frame.insert("numeric?", new Numeric_Primitive());
 
 }
