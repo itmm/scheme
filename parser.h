@@ -76,7 +76,7 @@ Obj *read_list(std::istream &in, int closing) {
 		get(in);
 		return result;
 	}
-	return new Pair { exp, read_list(in, closing) };
+	return cons(exp, read_list(in, closing));
 }
 
 double float_value(const std::string &v) {
@@ -177,10 +177,7 @@ Obj *parse_expression(std::istream &in) {
 	if (ch == ')' || ch == ']') { get(in); return nullptr; }
 	if (ch == '\'') {
 		ch = get(in);
-		return new Pair {
-			Symbol::get("quote"),
-			new Pair { read_expression(in), nullptr }
-		};
+		return build_list(Symbol::get("quote"), read_expression(in));
 	}
 	if (ch == '"') {
 		std::ostringstream result;

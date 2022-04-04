@@ -55,7 +55,7 @@ class Two_Primitive : public Primitive {
 class Cons_Primitive : public Two_Primitive {
 	protected:
 		Obj *apply_two(Obj *first, Obj *second) override {
-			return new Pair { first, second };
+			return cons(first, second);
 		}
 };
 
@@ -66,10 +66,10 @@ class Apply_Primitive: public Primitive {
 				ASSERT(! car(args) || is_pair(car(args)), "apply");
 				return car(args);
 			} else {
-				return new Pair {
+				return cons(
 					car(args),
 					build_arg_lst(cdr(args))
-				};
+				);
 			}
 		}
 	public:
@@ -149,19 +149,12 @@ class Garbage_Collect_Primitive : public Zero_Primitive {
 	protected:
 		Obj *apply_zero() override {
 			auto result { Obj::garbage_collect() };
-			return new Pair {
+			return build_list(
 				Symbol::get("collected"),
-				new Pair {
-					Integer::create(result.first),
-					new Pair {
-						Symbol::get("kept"),
-						new Pair {
-							Integer::create(result.second),
-							nullptr
-						}
-					}
-				}
-			};
+			       	Integer::create(result.first),
+				Symbol::get("kept"),
+				Integer::create(result.second)
+			);
 		}
 };
 

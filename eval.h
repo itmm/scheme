@@ -28,6 +28,8 @@ struct Procedure_Case {
 	Obj *body;
 };
 
+inline Obj *beginify(Obj *rest) { return cons(Symbol::get("begin"), rest); }
+
 class Procedure : public Function {
 		Frame *env_;
 	protected:
@@ -43,7 +45,7 @@ class Procedure : public Function {
 		Procedure(Frame *env): env_ { env } { }
 
 		void add_case(Obj *args, Obj *body) {
-			cases_.emplace_back(args, new Pair { Symbol::get("begin"), body });
+			cases_.emplace_back(args, beginify(body));
 		}
 
 		Procedure(Obj *args, Obj *body, Frame *env): env_ { env }
@@ -167,9 +169,9 @@ Obj *eval_list(Obj *exp, Frame *env) {
 	auto head { eval(car(exp), env) };
 	auto rest { as_pair(cdr(exp)) };
 	if (rest) {
-		return new Pair { head, eval_list(rest, env) };
+		return cons(head, eval_list(rest, env));
 	} else {
-		return new Pair { head, eval(cdr(exp), env) };
+		return cons(head, eval(cdr(exp), env));
 	}
 }
 
@@ -264,18 +266,9 @@ Obj *build_cond(Obj *lst) {
 		if (cdr(lst)) {
 			err("cond", "else not in last case");
 		}
-		return new Pair { Symbol::get("begin"), cons };
+		return beginify(cons);
 	}
-	return new Pair {
-		Symbol::get("if"),
-		new Pair {
-			cond,
-			new Pair {
-				new Pair { Symbol::get("begin"), cons },
-				new Pair { build_cond(cdr(lst)), nullptr }
-			}
-		}
-	};
+	return build_list(Symbol::get("if"), cond, beginify(cons), build_cond(cdr(lst)));
 }
 
 inline bool is_begin_special(Pair *lst) {
@@ -301,13 +294,13 @@ inline bool is_let_special(Pair *lst) {
 Obj *build_let_args(Obj *arg_vals, Obj *args) {
 	if (is_null(arg_vals)) { return args; }
 	args = build_let_args(cdr(arg_vals), args);
-	return new Pair { car(car(arg_vals)), args };
+	return cons(car(car(arg_vals)), args);
 }
 
 Obj *build_let_vals(Obj *arg_vals, Obj *vals) {
 	if (is_null(arg_vals)) { return vals; }
 	vals = build_let_vals(cdr(arg_vals), vals);
-	return new Pair { cadr(car(arg_vals)), vals };
+	return cons(cadr(car(arg_vals)), vals);
 }
 
 Obj *build_let(Obj *lst) {
@@ -318,36 +311,19 @@ Obj *build_let(Obj *lst) {
 	auto block { cdr(lst) };
 	auto args { build_let_args(arg_vals, nullptr) };
 	auto vals { build_let_vals(arg_vals, nullptr) };
-	auto lambda { new Pair {
-		Symbol::get("lambda"),
-		new Pair { args, block }
-	}};
+	auto lambda { cons(Symbol::get("lambda"), cons(args, block))};
 	if (name) {
-		auto inner_arg = new Pair { name, nullptr };
-		auto inner_set = new Pair { 
-			Symbol::get("set!"),
-			new Pair {
-				name,
-				new Pair { lambda, nullptr }
-			}
-		};
-		auto inner_call = new Pair { name, vals };
-		auto inner = new Pair {
-			Symbol::get("lambda"),
-			new Pair {
-				inner_arg,
-				new Pair {
-					inner_set,
-					new Pair {
-						inner_call,
-						nullptr
-					}
-				}
-			}
-		};
-		return new Pair { inner, new Pair { false_obj, nullptr } };
+		auto inner_arg = build_list(name);
+		auto inner_set = build_list(
+			Symbol::get("set!"), name, lambda
+		);
+		auto inner_call = cons(name, vals);
+		auto inner = build_list(
+			Symbol::get("lambda"), inner_arg, inner_set, inner_call
+		);
+		return build_list(inner, false_obj);
 	} else {
-		return new Pair { lambda, vals };
+		return cons(lambda, vals);
 	}
 }
 
@@ -428,9 +404,9 @@ class Syntax : public Obj {
 				}
 				if (! match) { match = new Frame { nullptr }; }
 				if (repeating) {
-					auto nw { new Pair {
+					auto nw { cons(
 						value, match->get(sym->value())
-					}};
+					)};
 					match->insert(sym->value(), nw);
 				} else {
 					match->insert(sym->value(), value);

@@ -218,3 +218,8 @@ std::ostream &Pair::write(std::ostream &out) {
 	return out;
 }
 
+Obj *cons(Obj *a, Obj *b) { return new Pair { a, b }; }
+Obj *build_list() { return nullptr; }
+template<typename T1, typename... Rest> Obj *build_list(T1 first, Rest... rest) {
+	return cons(first, build_list(rest...));
+}
