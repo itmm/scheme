@@ -13,31 +13,21 @@ class One_Primitive : public Primitive {
 		}
 };
 
-class Predicate : public One_Primitive {
+template<Obj *(FN)(Obj *)> class One_Primitive_Fn : public One_Primitive {
 	protected:
-		virtual bool is_true(Obj *arg) = 0;
 		Obj *apply_one(Obj *arg) override {
-			return to_bool(is_true(arg));
+			return FN(arg);
 		}
 };
 
-template<typename C> class Dynamic_Predicate : public Predicate {
+template<bool (FN)(Obj *)> class Predicate_Fn : public One_Primitive {
 	protected:
-		bool is_true(Obj *arg) override { 
-			return Dynamic::is<C>(arg);
+		Obj *apply_one(Obj *arg) override {
+			return to_bool(FN(arg));
 		}
 };
 
-class Car_Primitive : public One_Primitive {
-	protected:
-		Obj *apply_one(Obj *arg) override { return car(arg); }
-};
-
-
-class Cdr_Primitive : public One_Primitive {
-	protected:
-		Obj *apply_one(Obj *arg) override { return cdr(arg); }
-};
+template<typename C> class Dynamic_Predicate : public Predicate_Fn<Dynamic::is<C>> { };
 
 class Two_Primitive : public Primitive {
 	protected:
@@ -52,10 +42,17 @@ class Two_Primitive : public Primitive {
 		}
 };
 
-class Cons_Primitive : public Two_Primitive {
+template<Obj *(FN)(Obj *, Obj *)> class Two_Primitive_Fn : public Two_Primitive {
 	protected:
 		Obj *apply_two(Obj *first, Obj *second) override {
-			return cons(first, second);
+			return FN(first, second);
+		}
+};
+
+template<bool (FN)(Obj *, Obj *)> class Binary_Predicate_Fn : public Two_Primitive {
+	protected:
+		Obj *apply_two(Obj *first, Obj *second) override {
+			return to_bool(FN(first, second));
 		}
 };
 
@@ -83,57 +80,12 @@ class Apply_Primitive: public Primitive {
 		}
 };
 
-class Add_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return add(first, second);
-		}
-};
-
-class Sub_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return sub(first, second);
-		}
-};
-
-class Mul_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return mult(first, second);
-		}
-};
-
-class Div_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return div(first, second);
-		}
-};
-
-class Remainder_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			auto a { as_integer(first) };
-			auto b { as_integer(second) };
-			ASSERT(a && b, "remainder");
-			return remainder(a, b);
-		}
-};
-
-class Less_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return less(first, second);
-		}
-};
-
-class Equal_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return is_equal_num(first, second);
-		}
-};
+Obj *remainder(Obj *first, Obj *second) {
+	auto a { as_integer(first) };
+	auto b { as_integer(second) };
+	ASSERT(a && b, "remainder");
+	return remainder(a, b);
+}
 
 class Zero_Primitive : public Primitive {
 	protected:
@@ -158,32 +110,15 @@ class Garbage_Collect_Primitive : public Zero_Primitive {
 		}
 };
 
-class Binary_Predicate : public Two_Primitive {
-	protected:
-		virtual bool is_true(Obj *first, Obj *second) = 0;
-		Obj *apply_two(Obj *first, Obj *second) override {
-			return to_bool(is_true(first, second));
-		}
-};
-
-class Eq_Primitive : public Binary_Predicate {
-	protected:
-		bool is_true(Obj *first, Obj *second) override {
-			return first == second;
-		}
-};
-
-class Eqv_Primitive : public Binary_Predicate {
-	protected:
-		bool is_true(Obj *first, Obj *second) override {
-			if (first == second) { return true; }
-			if (::is_true(is_equal_num(first, second))) { return true; }
-			auto as { as_string(first) };
-			auto bs { as_string(second) };
-			if (as && bs && as->value() == bs->value()) { return true; }
-			return false;
-		}
-};
+inline bool eq(Obj *first, Obj *second) { return first == second; }
+inline bool eqv(Obj *first, Obj *second) {
+	if (eq(first, second)) { return true; }
+	if (::is_true(is_equal_num(first, second))) { return true; }
+	auto as { as_string(first) };
+	auto bs { as_string(second) };
+	if (as && bs && as->value() == bs->value()) { return true; }
+	return false;
+}
 
 std::ostream *out { &std::cout };
 
@@ -209,39 +144,19 @@ class Print_Primitive : public Primitive {
 		}
 };
 
-class Negate_Primitive: public One_Primitive {
-	protected:
-		Obj *apply_one(Obj *arg) override {
-			return negate(arg);
-		}
-};
+Obj *set_car(Obj *pair, Obj *new_car) {
+	auto p { as_pair(pair) };
+	ASSERT(p, "set-car!");
+	p->set_head(new_car);
+	return new_car;
+}
 
-class Is_Negative_Primitive: public Predicate {
-	protected:
-		bool is_true(Obj *arg) override {
-			return is_negative(arg);
-		}
-};
-
-class Set_Car_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			auto pair { as_pair(first) };
-			ASSERT(pair, "set-car!");
-			pair->set_head(second);
-			return second;
-		}
-};
-
-class Set_Cdr_Primitive : public Two_Primitive {
-	protected:
-		Obj *apply_two(Obj *first, Obj *second) override {
-			auto pair { as_pair(first) };
-			ASSERT(pair, "set-cdr!");
-			pair->set_rest(second);
-			return second;
-		}
-};
+Obj *set_cdr(Obj *pair, Obj *new_cdr) {
+	auto p { as_pair(pair) };
+	ASSERT(p, "set-cdr!");
+	p->set_rest(new_cdr);
+	return new_cdr;
+}
 
 Frame initial_frame { nullptr };
 
@@ -250,25 +165,25 @@ void setup_primitives() {
 	initial_frame.insert("numeric?", new Dynamic_Predicate<Numeric>());
 	initial_frame.insert("complex?", new Dynamic_Predicate<Complex_Numeric>());
 	initial_frame.insert("pair?", new Dynamic_Predicate<Pair>());
-	initial_frame.insert("car", new Car_Primitive());
-	initial_frame.insert("cdr", new Cdr_Primitive());
-	initial_frame.insert("cons", new Cons_Primitive());
-	initial_frame.insert("@binary+", new Add_Primitive());
-	initial_frame.insert("@binary-", new Sub_Primitive());
-	initial_frame.insert("@binary*", new Mul_Primitive());
-	initial_frame.insert("@binary/", new Div_Primitive());
-	initial_frame.insert("@negate", new Negate_Primitive());
-	initial_frame.insert("@negative?", new Is_Negative_Primitive());
-	initial_frame.insert("@binary<", new Less_Primitive());
-	initial_frame.insert("@binary=", new Equal_Primitive());
+	initial_frame.insert("car", new One_Primitive_Fn<car>());
+	initial_frame.insert("cdr", new One_Primitive_Fn<cdr>());
+	initial_frame.insert("cons", new Two_Primitive_Fn<cons>());
+	initial_frame.insert("@binary+", new Two_Primitive_Fn<add>());
+	initial_frame.insert("@binary-", new Two_Primitive_Fn<sub>());
+	initial_frame.insert("@binary*", new Two_Primitive_Fn<mult>());
+	initial_frame.insert("@binary/", new Two_Primitive_Fn<div>());
+	initial_frame.insert("@negate", new One_Primitive_Fn<negate>());
+	initial_frame.insert("@negative?", new Predicate_Fn<is_negative>());
+	initial_frame.insert("@binary<", new Two_Primitive_Fn<less>());
+	initial_frame.insert("@binary=", new Two_Primitive_Fn<is_equal_num>());
 	initial_frame.insert("apply", new Apply_Primitive());
 	initial_frame.insert("garbage-collect", new Garbage_Collect_Primitive());
-	initial_frame.insert("@binary-eq?", new Eq_Primitive());
-	initial_frame.insert("@binary-eqv?", new Eqv_Primitive());
-	initial_frame.insert("remainder", new Remainder_Primitive());
+	initial_frame.insert("@binary-eq?", new Binary_Predicate_Fn<eq>());
+	initial_frame.insert("@binary-eqv?", new Binary_Predicate_Fn<eqv>());
+	initial_frame.insert("remainder", new Two_Primitive_Fn<remainder>());
 	initial_frame.insert("newline", new Newline_Primitive());
 	initial_frame.insert("print", new Print_Primitive());
-	initial_frame.insert("set-car!", new Set_Car_Primitive());
-	initial_frame.insert("set-cdr!", new Set_Cdr_Primitive());
+	initial_frame.insert("set-car!", new Two_Primitive_Fn<set_car>());
+	initial_frame.insert("set-cdr!", new Two_Primitive_Fn<set_cdr>());
 
 }
