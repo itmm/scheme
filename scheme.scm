@@ -1,4 +1,4 @@
-(define nil ())
+(define nil '())
 (define (cadr l) (car (cdr l)))
 (define (cddr l) (cdr (cdr l)))
 (define (caddr l) (car (cddr l)))
@@ -6,7 +6,7 @@
 (define (list . l) l)
 (define true #t)
 (define false #f)
-(define (null? a) (eq? a '()))
+(define (null? a) (eq? a nil))
 
 (define (@numeric-cascade op)
   (let ([fn #f])
@@ -48,12 +48,12 @@
   (if (null? more)
       (let map1 ([ls ls])
         (if (null? ls)
-            '()
+            nil
             (cons (f (car ls))
 	          (map1 (cdr ls)))))
       (let map-more ([ls ls] [more more])
         (if (null? ls)
-	    '()
+	    nil
 	    (cons
 	      (apply f (car ls) (map car more))
 	      (map-more (cdr ls) (map cdr more)))))))
