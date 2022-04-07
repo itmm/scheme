@@ -7,11 +7,10 @@ class Integer : public Exact_Numeric {
 		using Digits = std::vector<unsigned short>;
 	private:
 		Digits digits_;
-		void normalize() {
-			while (! digits_.empty() && digits_.back() == 0) {
-				digits_.pop_back();
-			}
-		}
+
+		void normalize();
+		bool write_digit(unsigned digit, bool first, std::ostream &out);
+
 	public:
 		Integer(const Digits &digits): digits_ { digits } {
 			normalize();
@@ -22,49 +21,29 @@ class Integer : public Exact_Numeric {
 		static Integer *create(const std::string &digits);
 		static Integer *create(unsigned value);
 		const Digits &digits() const { return digits_; }
-		double float_value() const { 
-			double result { 0.0 };
-			for (auto it { digits_.rbegin() }; it != digits_.rend(); ++it) {
-				result = result * 10000.0 + *it;
-			}
-			return result;
-		}
+		double float_value() const;
 		bool is_zero() const { return digits_.empty(); }
 		virtual bool is_negative() const { return false; }
 		Integer *negate() const;
-		std::ostream &write(std::ostream &out) override {
-			if (is_negative()) { out << '-'; }
-			if (digits_.empty()) { return out << '0'; }
-			bool first { true };
-			for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
-				unsigned val { *i };
-				unsigned d0 { val % 10 }; val /= 10;
-				unsigned d1 { val % 10 }; val /= 10;
-				unsigned d2 { val % 10 }; val /= 10;
-				unsigned d3 { val % 10 };
-				if (d3 || ! first) {
-					out << static_cast<char>('0' + d3);
-					first = false;
-				}
-				if (d2 || ! first) {
-					out << static_cast<char>('0' + d2);
-					first = false;
-				}
-				if (d1 || ! first) {
-					out << static_cast<char>('0' + d1);
-					first = false;
-				}
-				if (d0 || ! first) {
-					out << static_cast<char>('0' + d0);
-					first = false;
-				}
-			}
-			return out;
-		}
+		std::ostream &write(std::ostream &out) override;
 };
+
+void Integer::normalize() {
+	while (! digits_.empty() && digits_.back() == 0) {
+		digits_.pop_back();
+	}
+}
 
 constexpr auto as_integer = Dynamic::as<Integer>;
 constexpr auto is_integer = Dynamic::is<Integer>;
+
+double Integer::float_value() const { 
+	double result { 0.0 };
+	for (auto it { digits_.rbegin() }; it != digits_.rend(); ++it) {
+		result = result * 10000.0 + *it;
+	}
+	return is_negative() ? -result : result;
+}
 
 class Negative_Integer : public Integer {
 	public:
@@ -115,6 +94,32 @@ Integer *Integer::create(unsigned value) {
 		result.push_back(value % 10000);
 	}
 	return new Integer { std::move(result) };
+}
+
+bool Integer::write_digit(unsigned digit, bool first, std::ostream &out) {
+	if (digit || ! first) {
+		out << static_cast<char>('0' + digit);
+		return false;
+	}
+	return first;
+}
+
+std::ostream &Integer::write(std::ostream &out) {
+	if (is_negative()) { out << '-'; }
+	if (digits_.empty()) { return out << '0'; }
+	bool first { true };
+	for (auto i { digits_.rbegin() }; i != digits_.rend(); ++i) {
+		unsigned val { *i };
+		unsigned d0 { val % 10 }; val /= 10;
+		unsigned d1 { val % 10 }; val /= 10;
+		unsigned d2 { val % 10 }; val /= 10;
+		unsigned d3 { val % 10 };
+		first = write_digit(d3, first, out);
+		first = write_digit(d2, first, out);
+		first = write_digit(d1, first, out);
+		first = write_digit(d0, first, out);
+	}
+	return out;
 }
 
 auto one { Integer::create(1) };

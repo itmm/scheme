@@ -13,6 +13,14 @@ class One_Primitive : public Primitive {
 		}
 };
 
+class To_Float: public One_Primitive {
+	protected:
+		Obj *apply_one(Obj *arg) override {
+			auto i { as_integer(arg) };
+			return i ? new Float { i->float_value() } : arg;
+		}
+};
+
 template<Obj *(FN)(Obj *)> class One_Primitive_Fn : public One_Primitive {
 	protected:
 		Obj *apply_one(Obj *arg) override {
@@ -185,5 +193,6 @@ void setup_primitives() {
 	initial_frame.insert("print", new Print_Primitive());
 	initial_frame.insert("set-car!", new Two_Primitive_Fn<set_car>());
 	initial_frame.insert("set-cdr!", new Two_Primitive_Fn<set_cdr>());
+	initial_frame.insert("int->float", new To_Float());
 
 }
