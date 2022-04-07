@@ -71,3 +71,5 @@
  (assert (= (or 1) 1))
  (assert (not (or false)))
  (assert (= (or 1 2 3) 1)))
+
+(assert (< (int->float -6) 0))
