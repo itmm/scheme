@@ -10,9 +10,15 @@ tests: scheme
 
 obj.o: obj.cpp obj.h
 
+# err.h: obj.h
+
 err.o: err.cpp err.h obj.h
 
-int.o: int.cpp int.h num_base.h type_base.h
+# int.h: num_base.h err.h
+# num_base.h: type_base.h
+# type_base.h: obj.h
+
+int.o: int.cpp int.h num_base.h type_base.h obj.h err.h
 
 scheme: $(OBJECTs)
 	$(CXX) $^ -o $@
