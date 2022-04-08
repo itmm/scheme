@@ -62,6 +62,9 @@ void print_help() {
 #include <fstream>
 
 int main(int argc, const char *argv[]) {
+	one = Integer::create(1);
+	two = Integer::create(2);
+	zero = Integer::create(0);
 	setup_primitives();
 	{
 		std::istringstream s { 

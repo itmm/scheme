@@ -12,6 +12,8 @@ obj.o: obj.cpp obj.h
 
 err.o: err.cpp err.h obj.h
 
+int.o: int.cpp int.h num_base.h type_base.h
+
 scheme: $(OBJECTs)
 	$(CXX) $^ -o $@
 
