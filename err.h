@@ -1,9 +1,14 @@
 /**
  * errors are special objects
  */
+
+#pragma once
+
+#include "obj.h"
+
 #include <string>
 
-std::ostream *err_stream { &std::cerr };
+extern std::ostream *err_stream;
 
 class Error : public Obj {
 		std::string raiser_;
@@ -11,31 +16,16 @@ class Error : public Obj {
 		Obj *data1_;
 		Obj *data2_;
 	protected:
-		void propagate_mark() override {
-			mark(data1_);
-			mark(data2_);
-		}
+		void propagate_mark() override;
 	public:
 		Error(
 			const std::string &raiser, const std::string &message,
 			Obj *data1, Obj *data2
-		):
-			raiser_ { raiser }, message_ { message },
-			data1_ { data1 }, data2_ { data2 }
-		{ }
-		std::ostream &write(std::ostream &out) override {
-			out << "(#error " << raiser_ << ": " << message_;
-			if (data1_) {
-				out << ": " << data1_;
-			}
-			if (data2_) {
-				out << " " << data2_;
-			}
-			return out << ')';
-		}
+		);
+		std::ostream &write(std::ostream &out) override;
 };
 
-void err(const std::string fn, const std::string msg, Obj *exp1 = nullptr, Obj *exp2 = nullptr) {
+inline void err(const std::string fn, const std::string msg, Obj *exp1 = nullptr, Obj *exp2 = nullptr) {
 	throw new Error { fn, msg, exp1, exp2 };
 }
 

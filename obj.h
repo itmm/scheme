@@ -6,6 +6,7 @@
  * for the garbage collection algorithm
  */
 
+#pragma once
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -21,7 +22,8 @@ class Obj {
 		static std::vector<Obj *> active_elements;
 
 		bool has_current_mark() {
-			return current_marked_->find(this) != current_marked_->end();
+			return current_marked_->find(this) !=
+			       	current_marked_->end();
 		}
 
 		void mark() {
@@ -43,6 +45,7 @@ class Obj {
 			current_marked_->erase(this);
 			other_marked_->erase(this);
 		}
+
 		virtual std::ostream &write(std::ostream &out) = 0;
 		static std::pair<unsigned, unsigned> garbage_collect();
 
@@ -55,17 +58,4 @@ class Obj {
 		}
 };
 
-Obj::Mark_Container Obj::a_marked_;
-Obj::Mark_Container Obj::b_marked_;
-Obj::Mark_Container *Obj::current_marked_ { &a_marked_ };
-Obj::Mark_Container *Obj::other_marked_ { &b_marked_ };
-
-std::vector<Obj *> Obj::active_elements;
-
-inline std::ostream &operator<<(std::ostream &out, Obj *elm) {
-	if (elm) {
-		return elm->write(out);
-	} else {
-		return out << "()";
-	}
-}
+std::ostream &operator<<(std::ostream &out, Obj *elm);
