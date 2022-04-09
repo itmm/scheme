@@ -6,14 +6,11 @@
  * 3. speed
  */
 
-#include "obj.h"
-#include "err.h"
-#include "types.h"
 #include "parser.h"
-#include "frame.h"
+#include "err.h"
 #include "eval.h"
+#include "frame.h"
 #include "primitives.h"
-#include "garbage-collect.h"
 
 std::ostream *prompt { nullptr };
 std::ostream *result { nullptr };
@@ -23,9 +20,9 @@ void process_stream(std::istream &in, bool with_header, bool exit_on_exception) 
 	active_frames.push_back(&initial_frame);
 
 	if (prompt) { *prompt << "? "; }
-	ch = in.get();
+	int ch = get(in);
 	if (with_header && ch == '#') {
-		while (ch != EOF && ch != '\n') { ch = in.get(); }
+		while (ch != EOF && ch != '\n') { ch = get(in); }
 	}
 	for (;;) {
 		try {
