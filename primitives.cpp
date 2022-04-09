@@ -4,6 +4,7 @@
 
 #include "primitives.h"
 #include "eval.h"
+#include "string.h"
 
 class One_Primitive : public Primitive {
 	protected:

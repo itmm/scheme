@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include "num_base.h"
+#include "num_types.h"
+#include "value.h"
 #include "int.h"
 
 using Float = Value_Element<double, Inexact_Numeric>;

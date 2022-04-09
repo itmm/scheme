@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "type_base.h"
+#include "dynamic.h"
 
 #include <map>
 

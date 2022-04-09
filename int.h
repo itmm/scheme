@@ -2,7 +2,7 @@
  * big integer type
  */
 
-#include "num_base.h"
+#include "num_types.h"
 #include "err.h"
 
 class Integer : public Exact_Numeric {

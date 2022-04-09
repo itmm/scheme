@@ -1,4 +1,5 @@
 #include "int.h"
+#include "string.h"
 
 void Integer::normalize() {
 	while (! digits_.empty() && digits_.back() == 0) {
