@@ -38,6 +38,7 @@ scheme.scm.h: scheme.scm
 	
 clean:
 	rm -f scheme $(OBJECTs)
+	which text2c >/dev/null && rm -f scheme.scm.h || true
 
 lines:
 	cat *.cpp *.h | wc -l
