@@ -323,6 +323,22 @@ struct Syntax_Rule {
 
 #include <set>
 
+class Syntax_State {
+		std::map<std::string, Obj *> single_;
+		std::map<std::string, Obj *> repeating_;
+	public:
+		void add(const std::string &key, Obj *value, bool repeating) {
+			if (repeating) {
+				repeating_[key] = cons(value, repeating_[key]);
+			} else {
+				single_[key] = value;
+			}
+		}
+		Obj *get(const std::string &key, bool repeating) {
+			return (repeating ? repeating_ : single_)[key];
+		}
+};
+
 class Syntax : public Obj {
 	public:
 		const std::string name_;
@@ -334,7 +350,7 @@ class Syntax : public Obj {
 			auto sym { as_symbol(car(nxt)) };
 			return sym && sym->value() == "...";
 		}
-		Frame *match_one(Obj *pattern, Obj *value, Frame *match, bool repeating) {
+		Syntax_State *match_one(Obj *pattern, Obj *value, Syntax_State *match, bool repeating) {
 			auto pair { as_pair(pattern) };
 			if (pair) {
 				auto vp { as_pair(value) };
@@ -346,29 +362,22 @@ class Syntax : public Obj {
 				if (keywords_.find(sym->value()) != keywords_.end()) {
 					if (value == sym) {
 						if (! match) {
-							match = new Frame { nullptr };
+							match = new Syntax_State { };
 						}
 						return match;
 					} else { return nullptr; }
 				}
-				if (! match) { match = new Frame { nullptr }; }
-				if (repeating) {
-					auto nw { cons(
-						value, match->get(sym->value())
-					)};
-					match->insert(sym->value(), nw);
-				} else {
-					match->insert(sym->value(), value);
-				}
+				if (! match) { match = new Syntax_State { }; }
+				match->add(sym->value(), value, repeating);
 				return match;
 			}
 			return nullptr;
 		}
-		Frame *match_rest(Obj *pattern, Obj *values, Frame *match, bool repeating) {
+		Syntax_State *match_rest(Obj *pattern, Obj *values, Syntax_State *match, bool repeating) {
 			for (;;) {
 				if (! pattern) {
 					if (values) { return nullptr; }
-					if (! match) { match = new Frame { nullptr }; }
+					if (! match) { match = new Syntax_State { }; }
 					return match;
 				}
 				if (! is_pair(pattern)) { return nullptr; }
@@ -394,10 +403,10 @@ class Syntax : public Obj {
 			}
 
 		}
-		Frame *build_match(Syntax_Rule &rule, Obj *lst) {
+		Syntax_State *build_match(Syntax_Rule &rule, Obj *lst) {
 			return match_rest(rule.pattern, lst, nullptr, false);
 		}
-		Obj *apply_match(Syntax_Rule &rule, Frame *match) {
+		Obj *apply_match(Syntax_Rule &rule, Syntax_State *match) {
 			err("syntax", "match not implemented");
 			return nullptr;
 		}
@@ -455,16 +464,16 @@ void syntax_tests() {
 	assert(m1 != nullptr);
 	auto m2 { s->match_one(parse_expression("x"), parse_expression("42"), nullptr, false) };
 	assert(m2 != nullptr);
-	assert(is_equal_num(m2->get("x"), Integer::create(42)));
+	assert(is_equal_num(m2->get("x", false), Integer::create(42)));
 	auto m3 { s->match_rest(nullptr, nullptr, nullptr, false) };
 	assert(m3 != nullptr);
 	auto m4 { s->match_rest(parse_expression("(a b)"), parse_expression("(2 3)"), nullptr, false) };
 	assert(m4 != nullptr);
-	assert(is_equal_num(m4->get("a"), Integer::create(2)));
-	assert(is_equal_num(m4->get("b"), Integer::create(3)));
+	assert(is_equal_num(m4->get("a", false), Integer::create(2)));
+	assert(is_equal_num(m4->get("b", false), Integer::create(3)));
 	auto m5 { s->build_match(s->rules_[0], parse_expression("(test 42)")) };
 	assert (m5 != nullptr);
-	std::cerr << m5->get("_") << '\n';
+	std::cerr << "_: " << m5->get("_", false) << '\n';
 }
 
 Obj *eval(Obj *exp, Frame *env) {
