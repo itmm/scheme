@@ -626,6 +626,6 @@ Obj *eval(Obj *exp, Frame *env) {
 }
 
 void foreach_syntax_extension(std::function<void(Obj *)> fn) {
-	for (auto &s : syntax_extensions) { fn(s.second); }
+	for (auto &[key, obj] : syntax_extensions) { fn(obj); }
 }
 
