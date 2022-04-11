@@ -116,8 +116,7 @@ Obj *apply(Obj *op, Obj *operands) {
 Obj *eval_list(Obj *exp, Frame *env) {
 	if (! exp) { return exp; }
 	auto head { eval(car(exp), env) };
-	auto rest { as_pair(cdr(exp)) };
-	if (rest) {
+	if (auto rest { as_pair(cdr(exp)) }) {
 		return cons(head, eval_list(rest, env));
 	} else {
 		return cons(head, eval(cdr(exp), env));
@@ -143,10 +142,8 @@ inline bool is_define_syntax_special(Obj *lst) {
 
 inline Obj *define_key(Pair *lst) {
 	auto first { cadr(lst) };
-	auto sym { as_symbol(first) };
-	if (sym) { return sym; }
-	auto args { as_pair(first) };
-	if (args) {
+	if (auto sym { as_symbol(first) }) { return sym; }
+	if (auto args { as_pair(first) }) {
 		auto name { as_symbol(car(args)) };
 		ASSERT(name, "define_key");
 		return name;
@@ -156,8 +153,7 @@ inline Obj *define_key(Pair *lst) {
 }
 
 inline Obj *define_value(Pair *lst, Frame *env) {
-	auto args { as_pair(cadr(lst)) };
-	if (args) {
+	if (auto args { as_pair(cadr(lst)) }) {
 		return new Procedure { cdr(args), cddr(lst), env };
 	} else {
 		ASSERT(is_null(cdddr(lst)), "define");
@@ -442,8 +438,7 @@ class Syntax : public Obj {
 std::map<std::string, Syntax *> syntax_extensions;
 
 Syntax *find_syntax_extension(Obj *lst) {
-	auto sym { first_symbol(lst) };
-	if (sym) {
+	if (auto sym { first_symbol(lst) }) {
 		auto got { syntax_extensions.find(sym->value()) };
 		if (got != syntax_extensions.end()) {
 			return got->second;
@@ -481,14 +476,11 @@ Obj *eval(Obj *exp, Frame *env) {
 	Active_Guard exp_guard { &exp };
 	for (;;) {
 		if (evals_to_self(exp)) { return exp; }
-		auto sym_value { as_symbol(exp) };
-		if (sym_value) {
+		if (auto sym_value { as_symbol(exp) }) {
 			return env->has(sym_value->value()) ? env->get(sym_value->value()) : exp;
 		}
-		auto lst_value { as_pair(exp) };
-		if (lst_value) {
-			auto se { find_syntax_extension(lst_value) };
-			if (se) {
+		if (auto lst_value { as_pair(exp) }) {
+			if (auto se { find_syntax_extension(lst_value) }) {
 				exp_guard.swap(se->apply(lst_value, env));
 				continue;
 			}
@@ -609,8 +601,7 @@ Obj *eval(Obj *exp, Frame *env) {
 				return Symbol::get("ok");
 			}
 			auto lst { eval_list(lst_value, env) };
-			auto proc { as_procedure(car(lst)) };
-			if (proc) {
+			if (auto proc { as_procedure(car(lst)) }) {
 				bool done { false };
 				for (auto &c : proc->cases_) {
 					if (case_matches(c, cdr(lst))) {
