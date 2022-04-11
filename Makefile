@@ -6,25 +6,30 @@ OBJECTs = $(addprefix build/,$(SOURCEs:.cpp=.o))
 CXXFLAGS += -g -Wall -std=c++17
 
 tests: scheme
-	./tests.scm
+	@echo "run tests"
+	@./tests.scm
 
 include $(wildcard deps/*.dep)
 
 build/%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $(notdir $(@:.o=.cpp)) -o $@ -MMD -MF deps/$(notdir $(@:.o=.dep))
+	@echo "c++ $@"
+	@mkdir -p build deps
+	@$(CXX) $(CXXFLAGS) -c $(notdir $(@:.o=.cpp)) -o $@ -MMD -MF deps/$(notdir $(@:.o=.dep))
 
 build/scheme.o: scheme.scm.h
 
 scheme: $(OBJECTs)
-	$(CXX) $^ -o $@
+	@echo "link $@"
+	@$(CXX) $^ -o $@
 
 scheme.scm.h: scheme.scm
-	which text2c >/dev/null && text2c <$^ >$@  || true
+	@echo "generate $@"
+	@which text2c >/dev/null && text2c <$^ >$@  || true
 	
 clean:
-	rm -Rf scheme build deps
-	which text2c >/dev/null && rm -f scheme.scm.h || true
-	mkdir -p build deps
+	@echo "clean"
+	@rm -Rf scheme build deps
+	@which text2c >/dev/null && rm -f scheme.scm.h || true
 
 lines:
-	cat *.cpp *.h | wc -l
+	@cat *.cpp *.h | wc -l
