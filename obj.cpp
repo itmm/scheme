@@ -1,5 +1,6 @@
 #include "obj.h"
 #include "eval.h"
+#include "int.h"
 
 Obj::Mark_Container Obj::a_marked_;
 Obj::Mark_Container Obj::b_marked_;

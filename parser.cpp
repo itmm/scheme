@@ -1,6 +1,8 @@
 #include "parser.h"
 #include "types.h"
 #include "string.h"
+#include "err.h"
+#include "num.h"
 
 static int ch { ' ' };
 static bool last_is_hash { false };

@@ -11,6 +11,7 @@
 #include "eval.h"
 #include "frame.h"
 #include "primitives.h"
+#include "int.h"
 
 std::ostream *prompt { nullptr };
 std::ostream *result { nullptr };

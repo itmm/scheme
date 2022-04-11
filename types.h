@@ -24,8 +24,6 @@ class Symbol : public Obj {
 constexpr auto as_symbol = Dynamic::as<Symbol>;
 constexpr auto is_symbol = Dynamic::is<Symbol>;
 
-#include "num.h"
-
 class False : public Obj {
 	public:
 		False() {}

@@ -2,8 +2,9 @@
  * big integer type
  */
 
+#pragma once
+
 #include "num-types.h"
-#include "err.h"
 
 class Integer : public Exact_Numeric {
 	public:

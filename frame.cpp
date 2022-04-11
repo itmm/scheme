@@ -1,4 +1,5 @@
 #include "frame.h"
+#include "err.h"
 
 void Frame::propagate_mark() {
 	for (auto &[key, obj] : elements_) {

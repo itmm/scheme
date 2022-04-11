@@ -4,6 +4,7 @@
 
 #include "num.h"
 #include "parser.h"
+#include "err.h"
 
 std::ostream &Fraction::write(std::ostream &out) {
 	return out << num_ << '/' << denom_;

@@ -1,5 +1,8 @@
 #include "eval.h"
 #include "parser.h"
+#include "err.h"
+#include "num.h"
+#include "int.h"
 
 std::ostream &Primitive::write(std::ostream &out) {
 	return out << "#primitive";

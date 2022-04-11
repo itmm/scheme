@@ -1,4 +1,6 @@
 #include "types.h"
+#include "num.h"
+#include "err.h"
 
 Symbol::~Symbol() {
 	auto it { symbols_.find(value_) };

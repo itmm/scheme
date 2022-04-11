@@ -5,6 +5,9 @@
 #include "primitives.h"
 #include "eval.h"
 #include "string.h"
+#include "err.h"
+#include "int.h"
+#include "num.h"
 
 class One_Primitive : public Primitive {
 	protected:
