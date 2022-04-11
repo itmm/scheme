@@ -1,8 +1,8 @@
 #include "frame.h"
 
 void Frame::propagate_mark() {
-	for (auto &v : elements_) {
-		mark(v.second);
+	for (auto &[key, obj] : elements_) {
+		mark(obj);
 	}
 	mark(next_);
 }
