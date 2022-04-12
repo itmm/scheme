@@ -67,9 +67,8 @@ static void write_complex_pair(std::ostream &out, Pair *pair, std::string indent
 void write_inner_complex_pair(std::ostream &out, Pair *pair, std::string indent) {
 	auto first { car(pair) };
 	out << first;
-	auto sym { as_symbol(first) };
 	bool no_newline { false };
-	if (sym) {
+	if (auto sym { as_symbol(first) }) {
 		for (unsigned i { 0 }; i <= sym->value().length(); ++i) {
 			indent += ' ';
 		}

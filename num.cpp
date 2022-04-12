@@ -125,16 +125,21 @@ template<typename R> class Single_Propagate {
 		virtual R apply_else(Obj *a) = 0;
 	public:
 		R propagate(Obj *a) {
-			auto ai { as_integer(a) };
-			if (ai) { return apply_int(ai); }
-			auto af { as_fraction(a) };
-			if (af) { return apply_fract(af); }
-			auto ar { as_float(a) };
-			if (ar) { return apply_real(ar); }
-			auto aec { as_exact_complex(a) };
-			if (aec) { return apply_exact_complex(aec); }
-			auto aic { as_inexact_complex(a) };
-			if (aic) { return apply_inexact_complex(aic); }
+			if (auto ai { as_integer(a) }) {
+			       	return apply_int(ai);
+		       	}
+			if (auto af { as_fraction(a) }) {
+				return apply_fract(af);
+			}
+			if (auto ar { as_float(a) }) {
+				return apply_real(ar);
+			}
+			if (auto aec { as_exact_complex(a) }) {
+				return apply_exact_complex(aec);
+			}
+			if (auto aic { as_inexact_complex(a) }) {
+				return apply_inexact_complex(aic);
+			}
 			return apply_else(a);
 		}
 };
